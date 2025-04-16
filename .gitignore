@@ -1,0 +1,42 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/*
+Dockerfile.cross
+helm.iml
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Go workspace file
+go.work
+*.code-workspace
+# Kubernetes Generated files - skip generated files, except for vendored files
+!vendor/**/zz_generated.*
+
+# editor and IDE paraphernalia
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Files that might be committed from running guides
+/kubeai.yaml
+/kubeai-models.yaml
+/helm-values.yaml
+/model-helm-values.yaml
+Chart.lock
+*.tgz
+# Ignore python virtual env
+.venv
+*__pycache__
+site
+*.tar.gz
+/tmp

@@ -1,0 +1,11 @@
+Application successfully deployed!
+
+To access the OpenWebUI, use the following URL:
+{{- $config := (lookup "v1" "ConfigMap" "devtroncd" "devtron-global-config") }}
+
+https://comfyui-x-{{ .Release.Namespace }}-x-{{ $config.data.vksID }}.sproxy.hd-01.alayanew.com:22443/
+
+
+To check the status of the deployed containers, use the following command:
+kubectl get pods -n {{ .Release.Namespace }}
+

@@ -1,0 +1,7 @@
+apiVersion: osm.datacanvas.com/v1alpha1
+kind: ServiceExporter
+metadata:
+  name: {{ .Values.modelName }} # 你的ServiceExporter资源的名称
+spec:
+  serviceName: {{ .Values.modelName }} # required
+  servicePort: 8188              # 你的服务的端口

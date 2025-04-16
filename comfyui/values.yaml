@@ -1,0 +1,18 @@
+modelName: comfyui
+
+#nvidia.com/gpu-h100-80gb-hbm3
+
+#nvidia.com/gpu-l40s
+image: "registry.hd-01.alayanew.com:8443/alayanew-c9cbee5c-c532-438e-8e72-20f5da1277b2/pytorch-2.6.0-cuda-12.8.0-py311-comfyui-0.3.27:1.2"
+# 资源配置
+resources:
+  requests:
+      cpu: 10
+      memory: 100G
+      gpuKey: nvidia.com/gpu-l40s
+      gpuCount: 1
+  limits:
+    cpu: 10
+    memory: 100G
+    gpuKey: nvidia.com/gpu-l40s
+    gpuCount: 1

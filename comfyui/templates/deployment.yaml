@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.modelName }}
+  labels:
+    app: {{ .Values.modelName }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.modelName }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.modelName }}
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: {{ .Values.modelName }}
+          #image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/python:3.9.16-bullseye
+          image: {{.Values.image}}
+          imagePullPolicy: IfNotPresent
+          # command: ['/bin/bash', '-c', 'while true; do sleep 30; done']
+          ports:
+            - containerPort: 8188
+              name: http
+              protocol: TCP
+          volumeMounts:
+            - name: mnt
+              mountPath: "/userdata"
+              subPath: apps/{{ .Values.modelName  }}/model
+            - name: dshm
+              mountPath: /dev/shm
+          resources:
+            resources:
+              requests:
+                cpu: {{ .Values.resources.requests.cpu }}
+                memory: {{ .Values.resources.requests.memory }}
+                {{ .Values.resources.requests.gpuKey }}: {{ .Values.resources.requests.gpuCount }}
+              limits:
+                cpu: {{ .Values.resources.limits.cpu }}
+                memory: {{ .Values.resources.limits.memory }}
+                {{ .Values.resources.limits.gpuKey }}: {{ .Values.resources.limits.gpuCount }}
+      volumes:
+        - name: mnt
+          persistentVolumeClaim:
+            claimName: pvc-capacity-userdata
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Gi

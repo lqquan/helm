@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.modelName }}
+  labels:
+    app: {{ .Values.modelName }}
+spec:
+  ports:
+    - port: 8188
+      targetPort: 8188
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ .Values.modelName }}
