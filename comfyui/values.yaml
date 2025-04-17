@@ -1,18 +1,19 @@
 modelName: comfyui
 
-#nvidia.com/gpu-h100-80gb-hbm3
+#如果需要先下载模型，可以选择无卡启动
+enableGpu: 0  # 1: 启用 GPU , 0: 无卡启动
 
-#nvidia.com/gpu-l40s
-image: "registry.hd-01.alayanew.com:8443/alayanew-c9cbee5c-c532-438e-8e72-20f5da1277b2/pytorch-2.6.0-cuda-12.8.0-py311-comfyui-0.3.27:1.2"
-# 资源配置
-resources:
-  requests:
-      cpu: 10
-      memory: 100G
-      gpuKey: nvidia.com/gpu-l40s
-      gpuCount: 1
-  limits:
-    cpu: 10
-    memory: 100G
-    gpuKey: nvidia.com/gpu-l40s
-    gpuCount: 1
+
+
+#GPU型号
+#nvidia.com/gpu-h100-80gb-hbm3  显存80G
+#nvidia.com/gpu-l40s            显存48G
+
+#GPU型号   #可以从上面的型中选择,无卡启动这里也不需要修改
+gpuKey: nvidia.com/gpu-l40s
+#GPU个数
+gpuCount: 1
+
+
+image: "comfyui-0.3.27"
+tag: "1.6"
