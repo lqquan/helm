@@ -21,7 +21,8 @@ spec:
           image: "registry.hd-01.alayanew.com:8443/alayanew-c9cbee5c-c532-438e-8e72-20f5da1277b2/pytorch-2.6.0-cuda-12.8.0-py311-{{ .Values.image }}:{{ .Values.tag }}"
           imagePullPolicy: IfNotPresent
           {{- if eq  (int .Values.enableGpu) 0 }}
-          command: [ "/bin/bash", "-c", "jupyter lab --ip=0.0.0.0 --port=8188 --allow-root --no-browser" ]
+          command: [ "/bin/bash", "-c", "jupyter lab  --LabApp.default_url='/lab/tree/opt/welcome.ipynb' \
+          --ip=0.0.0.0 --port=8188 --allow-root --no-browser  --ServerApp.token='' --ServerApp.password=''" ]
           {{- end }}
           ports:
             - containerPort: 8188
@@ -29,7 +30,7 @@ spec:
               protocol: TCP
           volumeMounts:
             - name: mnt
-              mountPath: "/alaynew"
+              mountPath: "/alayanew"
               subPath: apps/{{ .Values.modelName  }}/model
             - name: dshm
               mountPath: /dev/shm
