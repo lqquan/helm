@@ -9,7 +9,7 @@ description: >
   目前已经集成 Flux 文生图（Text-to-Image）模型和当前最火的 DeepSeek 深度学习模型，以增强图像生成的能力。
 
   功能介绍：
-  - ComfyUI 20250120 最新版本，支持 FLUX、HunyuanVideo、SD3 等。
+  - ComfyUI 20250418 最新版本，支持 FLUX、HunyuanVideo、SD3 等。
   - 预置 FLUX、HunyuanVideo，放大模型基本模型。
   - 预置 ControlnetNet 各种模型和预处理器。
   - 预置大量常用插件。

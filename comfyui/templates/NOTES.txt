@@ -1,16 +1,23 @@
 ===========================================================
               🚀 应用程序成功部署！ 🚀
 ===========================================================
+📦 版本号：{{ .Chart.Version }}
+📥 下载量：1.2k
+
 {{- $config := (lookup "v1" "ConfigMap" "devtroncd" "devtron-global-config") }}
 ✅ **访问 WebUI**，请使用以下 URL：
 🌐 https://{{ .Values.modelName }}-x-{{ .Release.Namespace }}-x-{{ $config.data.vksID }}.sproxy.hd-01.alayanew.com:22443/
 
+🔐 **SSH 登录信息**
+🧰 ComfyUI 已开放 SSH 端口，便于远程管理。
+📌 **使用步骤如下：**
+1️⃣ 在一个终端窗口中运行以下命令（保持该窗口开启）：
+    📦 kubectl port-forward svc/{{ .Values.modelName }} 22663:22
+2️⃣ 打开另一个终端窗口，执行以下登录命令：
+    💻 ssh root@localhost -p 22663
+    {{- $sshPassword := include "mychart.password.with.cache" . }}
+🔑 **登录密码：** {{ $sshPassword }}
+⚠️请保持第一个终端窗口处于运行状态，否则连接将会中断。
 
-✅ **SSH 登录信息**：
-🔑 使用以下命令通过 SSH 登录:以下命令不会退出,需要一直开直
-   kubectl port-forward svc/{{ .Values.modelName }} 22663:22
-   另外开一个窗口登录：
-   ssh root@localhost -p 22663
-   密码:Alaynew257
 
 ===========================================================

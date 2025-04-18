@@ -8,18 +8,18 @@
 
 
 
-- 首次启动需要下载基本的模型，请稍等几分钟
+- 首次启动需要下载自己下载模型,可以无卡启动
 
 - 镜像在 l40s, h100上测试没问题。
-- 预置模型路径：/userdata/models
-- ComfyUI 中自动下载的模型路径：/userdata/models
+- 预置模型路径：/alayanew/models
+- ComfyUI 中自动下载的模型路径：/alayanew/models
 - 基础环境：PyTorch 2.6.0, Python 3.11(ubuntu22.04), Cuda 12.8
 
 # 功能介绍
 
 
 
-- ComfyUI 20250120 最新版本，支持 FLUX、HunyuanVideo 、SD3等
+- ComfyUI 20250418 最新版本，支持 FLUX、HunyuanVideo 、SD3等
 
 - 预置 FLUX、HunyuanVideo 、高清放大等基本模型
 - 预置 ControlnetNet 各种模型和预处理器
@@ -34,7 +34,7 @@
 
 # ChangeLog
 
-- 20250227 
+- 20250418
 
   更新基础环境到 PyTorch 2.6.0, Python 3.11(ubuntu22.04), Cuda 12.8
 
@@ -47,14 +47,8 @@
 
 
 # 获取ComfyUI地址
-地址模板: https://comfyui-x-{namespace}-x-{vksID}.sproxy.hd-01.alayanew.com:22443  
-{namespace}: 替换成您实际的命名空间  
-{vksID}: values.yaml中的vksID  
-如下是namespace=default, vksId=vcacu2dshr12的openwebui地址  
+查看NOTES.txt 
 
-```
-https://comfyui-x-default-x-vcacu2dshr12.sproxy.hd-01.alayanew.com:22443
-```
 
 ### 选择模型
 
