@@ -10,5 +10,9 @@ spec:
       targetPort: 8188
       protocol: TCP
       name: http
+    - port: 22
+      targetPort: 22
+      protocol: TCP
+      name: ssh
   selector:
     app: {{ .Values.modelName }}

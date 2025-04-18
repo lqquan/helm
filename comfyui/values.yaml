@@ -1,4 +1,4 @@
-modelName: comfyui
+modelName: comfyui1
 
 #如果需要先下载模型，可以选择无卡启动
 enableGpu: 0  # 1: 带GPU启动 , 0: 无卡启动
@@ -12,4 +12,4 @@ gpuKey: nvidia.com/gpu-l40s
 gpuCount: 1
 ##镜像信息
 image: "comfyui-0.3.27"
-tag: "2.8"
+tag: "3.3"

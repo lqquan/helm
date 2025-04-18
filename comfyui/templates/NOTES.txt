@@ -1,11 +1,16 @@
-Application successfully deployed!
-
-To access the OpenWebUI, use the following URL:
+===========================================================
+              🚀 应用程序成功部署！ 🚀
+===========================================================
 {{- $config := (lookup "v1" "ConfigMap" "devtroncd" "devtron-global-config") }}
+✅ **访问 WebUI**，请使用以下 URL：
+🌐 https://{{ .Values.modelName }}-x-{{ .Release.Namespace }}-x-{{ $config.data.vksID }}.sproxy.hd-01.alayanew.com:22443/
 
-https://comfyui-x-{{ .Release.Namespace }}-x-{{ $config.data.vksID }}.sproxy.hd-01.alayanew.com:22443/
 
+✅ **SSH 登录信息**：
+🔑 使用以下命令通过 SSH 登录:以下命令不会退出,需要一直开直
+   kubectl port-forward svc/{{ .Values.modelName }} 22663:22
+   另外开一个窗口登录：
+   ssh root@localhost -p 22663
+   密码:Alaynew257
 
-To check the status of the deployed containers, use the following command:
-kubectl get pods -n {{ .Release.Namespace }}
-
+===========================================================
