@@ -7,7 +7,7 @@
 bin/*
 Dockerfile.cross
 helm.iml
-
+*.log
 # Test binary, built with `go test -c`
 *.test
 
