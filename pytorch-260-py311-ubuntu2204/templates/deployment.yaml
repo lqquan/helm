@@ -19,11 +19,8 @@ spec:
       containers:
         - name: {{ .Values.modelName }}
           #image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/python:3.9.16-bullseye
-          image: "registry.hd-01.alayanew.com:8443/alayanew-c9cbee5c-c532-438e-8e72-20f5da1277b2/pytorch-2.6.0-cuda-12.8.0-py311-{{ .Values.image }}:{{ .Values.tag }}"
+          image: "registry.hd-01.alayanew.com:8443/alayanew-c9cbee5c-c532-438e-8e72-20f5da1277b2/{{ .Values.image }}:{{ .Values.tag }}"
           imagePullPolicy: IfNotPresent
-          {{- if eq  (int .Values.enableGpu) 0 }}
-          command: ["/opt/alayanew-script/noGpuStart.sh"]
-          {{- end }}
           ports:
             - containerPort: 8188
               name: http
@@ -32,6 +29,8 @@ spec:
               name: ssh
               protocol: TCP
           env:
+            - name: ENABLE_GPU
+              value: "{{ .Values.enableGpu }}"
             - name: SSH_PASSWORD
               value: "{{ include "mychart.password.with.cache" . }}"
           volumeMounts:

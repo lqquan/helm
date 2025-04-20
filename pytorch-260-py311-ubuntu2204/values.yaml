@@ -1,4 +1,4 @@
-modelName: comfyui
+modelName: pytorch-260-py311-ubuntu2204
 
 #如果需要先下载模型，可以选择无卡启动
 enableGpu: 1  # 1: 带GPU启动 , 0: 无卡启动
@@ -11,5 +11,5 @@ gpuKey: nvidia.com/gpu-l40s
 #GPU个数
 gpuCount: 1
 ##镜像信息
-image: "comfyui-0.3.27"
-tag: "3.7.3"
+image: "ubuntu2204-python311-cuda128"
+tag: "1.1.15"
