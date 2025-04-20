@@ -12,7 +12,7 @@
 🧰 ComfyUI 已开放 SSH 端口，便于远程管理。
 📌 **使用步骤如下：**
 1️⃣ 在一个终端窗口中运行以下命令（保持该窗口开启）：
-    📦 kubectl port-forward svc/{{ .Values.modelName }} -n {{ .Release.Namespace }} 22663:22
+    📦 kubectl port-forward svc/{{ .Values.modelName }} 22663:22
 2️⃣ 打开另一个终端窗口，执行以下登录命令：
     💻 ssh root@localhost -p 22663
     {{- $sshPassword := include "mychart.password.with.cache" . }}

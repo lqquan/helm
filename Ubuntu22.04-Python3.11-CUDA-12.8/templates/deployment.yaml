@@ -1,0 +1,63 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.modelName }}
+  labels:
+    app: {{ .Values.modelName }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.modelName }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.modelName }}
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: {{ .Values.modelName }}
+          #image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/python:3.9.16-bullseye
+          image: "registry.hd-01.alayanew.com:8443/alayanew-c9cbee5c-c532-438e-8e72-20f5da1277b2/pytorch-2.6.0-cuda-12.8.0-py311-{{ .Values.image }}:{{ .Values.tag }}"
+          imagePullPolicy: IfNotPresent
+          {{- if eq  (int .Values.enableGpu) 0 }}
+          command: ["/opt/alayanew-script/noGpuStart.sh"]
+          {{- end }}
+          ports:
+            - containerPort: 8188
+              name: http
+              protocol: TCP
+            - containerPort: 22
+              name: ssh
+              protocol: TCP
+          env:
+            - name: SSH_PASSWORD
+              value: "{{ include "mychart.password.with.cache" . }}"
+          volumeMounts:
+            - name: mnt
+              mountPath: "/alayanew"
+              subPath: apps/{{ .Values.modelName  }}/model
+            - name: dshm
+              mountPath: /dev/shm
+          resources:
+            requests:
+              cpu: {{ if eq (int .Values.enableGpu) 1 }}10{{ else }}5{{ end }}
+              memory: {{ if eq (int .Values.enableGpu) 1 }}100G{{ else }}32G{{ end }}
+              {{- if eq (int .Values.enableGpu) 1 }}
+              {{ .Values.gpuKey | quote }}: {{ .Values.gpuCount }}
+              {{- end }}
+            limits:
+              cpu: {{ if eq (int .Values.enableGpu) 1 }}10{{ else }}5{{ end }}
+              memory: {{ if eq (int .Values.enableGpu) 1 }}100G{{ else }}32G{{ end }}
+              {{- if eq (int .Values.enableGpu) 1 }}
+              {{ .Values.gpuKey | quote }}: {{ .Values.gpuCount }}
+              {{- end }}
+      volumes:
+        - name: mnt
+          persistentVolumeClaim:
+            claimName: pvc-capacity-userdata
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Gi

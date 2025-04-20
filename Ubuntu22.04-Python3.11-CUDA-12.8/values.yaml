@@ -1,0 +1,15 @@
+modelName: comfyui
+
+#如果需要先下载模型，可以选择无卡启动
+enableGpu: 1  # 1: 带GPU启动 , 0: 无卡启动
+
+#GPU型号
+#nvidia.com/gpu-h100-80gb-hbm3  显存80G
+#nvidia.com/gpu-l40s            显存48G
+#GPU型号   #可以从上面的型中选择,无卡启动这里也不需要修改
+gpuKey: nvidia.com/gpu-l40s
+#GPU个数
+gpuCount: 1
+##镜像信息
+image: "comfyui-0.3.27"
+tag: "3.7.3"

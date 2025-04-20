@@ -1,0 +1,34 @@
+apiVersion: v2
+type: application
+name: comfyui
+version: 1.10.2
+appVersion: v0.12.0
+description: >
+  使用 Kubernetes 部署 ComfyUI 的 Helm Chart。
+  ComfyUI 是一个灵活的用户界面（UI）框架，用于与深度学习模型进行交互，特别适用于图像生成和增强任务。
+  目前已经集成 Flux 文生图（Text-to-Image）模型和当前最火的 DeepSeek 深度学习模型，以增强图像生成的能力。
+
+  功能介绍：
+  - ComfyUI 20250418 最新版本，支持 FLUX、HunyuanVideo、SD3 等。
+  - 预置 FLUX、HunyuanVideo，放大模型基本模型。
+  - 预置 ControlnetNet 各种模型和预处理器。
+  - 预置大量常用插件。
+  - 调整了 ComfyUI 目录位置，方便扩容（放到数据盘）。
+
+
+icon: "https://caddy-x-caddy-x-vckg0tnisvp5.sproxy.hd-01.alayanew.com:22443/helm-images/comfyui-icon.png"
+
+
+# home: https://www.substratus.ai
+keywords:
+- COMFYUI
+- comfyui
+- flux
+  
+maintainers:
+- name: nstogner
+  url: https://www.alayanew.com
+- email: chenjie2@zetyun.com
+  name: chenjie2
+  url: https://www.alayanew.com
+
