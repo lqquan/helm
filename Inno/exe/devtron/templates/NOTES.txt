@@ -1,0 +1,17 @@
+请等待大概1分钟左右在执行以下命令。
+
+1. 获取网页地址:
+   kubectl describe serviceexporter devtron-itf -n devtroncd
+
+   在其中的Status.Conditions.Message中，可以找到网页地址。如：
+   IngressRoute successfully updated, url: https://devtron-service-x-devtroncd-x-***********.sproxy.hd-01.alayanew.com
+   访问地址为：https://devtron-service-x-devtroncd-x-***********.sproxy.hd-01.alayanew.com:22443
+
+2. 获取管理员密码:
+   kubectl -n devtroncd get secret devtron-secret -o jsonpath='{.data.ADMIN_PASSWORD}' | base64 -d
+
+   输出的密码即为管理员密码。
+
+   如果在Windows CMD下运行，使用如下命令：
+   kubectl -n devtroncd get secret devtron-secret -o jsonpath='{.data.ADMIN_PASSWORD}'
+   输出的结果需要进行base64解码。

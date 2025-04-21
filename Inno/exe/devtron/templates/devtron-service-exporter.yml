@@ -1,0 +1,10 @@
+# sd_serviceexporter.yaml
+# vcluster对外发布服务
+
+apiVersion: osm.datacanvas.com/v1alpha1
+kind: ServiceExporter
+metadata:
+  name: devtron-itf # immutable
+spec:
+  serviceName: devtron-service # required
+  servicePort: 80
