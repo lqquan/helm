@@ -11,5 +11,5 @@ gpuKey: nvidia.com/gpu-l40s
 #GPU个数
 gpuCount: 1
 ##镜像信息
-image: "ubuntu2204-python311-cuda128"
+image: "pytorch-260-py311-ubuntu2204"
 tag: "1.1.15"
