@@ -628,8 +628,10 @@ begin
       '  echo 执行命令: "' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --timeout 300s' + #13#10 +
       '  "' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --timeout 300s > "' + LogFile + '.output" 2>&1' + #13#10 +
       ')' + #13#10 +
+      'echo 创建 devtron-global-config configmap...' + #13#10 +
+      'echo 执行命令: "' + ExpandConstant('{app}\kubectl.exe') + '" create configmap devtron-global-config -n devtroncd --from-literal=vksID=%vksid%' + #13#10 +
+      '"' + ExpandConstant('{app}\kubectl.exe') + '" create configmap devtron-global-config -n devtroncd --from-literal=vksID=%vksid% >> "' + LogFile + '.output" 2>&1' + #13#10 +
       'echo 安装完成，返回代码: %ERRORLEVEL%' + #13#10 ,
-
       False);
     // 执行批处理文件
     if not Exec(ExpandConstant('{cmd}'), '/c "' + TempBatchFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
