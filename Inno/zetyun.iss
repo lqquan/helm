@@ -466,8 +466,11 @@ var
   CmdLine, Output: string;
   ResultCode: Integer;
   OutputContent: AnsiString;
+  LogFileAdmin: string;
+
 begin
   Result := '';
+  LogFileAdmin := ExpandConstant('{app}\adminPassword.log');
 
   // 创建临时文件
   TempInputFile := ExpandConstant('{tmp}\admin_pwd_input.txt');
@@ -501,11 +504,16 @@ begin
         // 移除可能的空白字符和换行符
         Result := Trim(OutputContent);
         Log('成功获取 Devtron 管理员密码，长度: ' + IntToStr(Length(Result)));
+        Exec(ExpandConstant('{cmd}'), '/c echo 成功获取 Devtron 管理员密码，长度: ' + IntToStr(Length(Result)) + ' >> "' + LogFileAdmin + '.output"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+
       end;
     end
     else
     begin
       Log('密码输出文件不存在: ' + TempOutputFile);
+      Exec(ExpandConstant('{cmd}'), '/c echo 密码输出文件不存在: ' + TempOutputFile + ' >> "' + LogFileAdmin + '.output"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
     end;
 
     // 如果密码为空，尝试直接读取输入文件并手动解码
@@ -529,6 +537,8 @@ begin
           begin
             Result := Trim(OutputContent);
             Log('使用PowerShell解码成功，密码长度: ' + IntToStr(Length(Result)));
+            Exec(ExpandConstant('{cmd}'), '/c echo 使用PowerShell解码成功，密码长度: ' + IntToStr(Length(Result)) + ' >> "' + LogFileAdmin + '.output"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
           end;
         end;
       end;
@@ -536,6 +546,7 @@ begin
   end
   else
   begin
+    Exec(ExpandConstant('{cmd}'), '/c echo 执行获取密码命令失败，错误代码:: ' + IntToStr(ResultCode) + ' >> "' + LogFileAdmin + '.output"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Log('执行获取密码命令失败，错误代码: ' + IntToStr(ResultCode));
   end;
 
@@ -621,6 +632,10 @@ begin
       ')' + #13#10 +
       'echo 提取的集群ID: %vksid%' + #13#10 +
       'echo 开始安装Devtron，使用集群ID: %vksid%' + #13#10 +
+
+      '"' + ExpandConstant('{app}\kubectl.exe') + '" delete namespace  devtroncd >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\helm.exe') + '" uninstall devtron --namespace devtroncd  >> "' + LogFile + '.output" 2>&1' + #13#10 +
+
       'if defined vksid (' + #13#10 +
       '  echo 执行命令: "' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --set --set global.vksID=%vksid% --timeout 300s' + #13#10 +
       '  "' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --set global.vksID=%vksid% --timeout 300s > "' + LogFile + '.output" 2>&1' + #13#10 +
