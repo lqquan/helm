@@ -652,7 +652,7 @@ begin
     if not Exec(ExpandConstant('{cmd}'), '/c "' + TempBatchFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin
       Log('启动Devtron安装失败，错误代码: ' + IntToStr(ResultCode));
-      MsgBox('启动Devtron安装失败。错误代码: ' + IntToStr(ResultCode), mbError, MB_OK);
+      //MsgBox('启动Devtron安装失败。错误代码: ' + IntToStr(ResultCode), mbError, MB_OK);
       Exit;
     end;
 
@@ -695,8 +695,8 @@ begin
   // 如果无法获取密码，显示提示信息
     if DevtronPassword = '' then
     begin
-      MsgBox('无法自动获取 Devtron 管理员密码。' + #13#10 +
-            '您可以稍后使用以下命令获取:' + #13#10 +
+      MsgBox('Devtron安装已完成。安装完成后，您可以通过桌面快捷方式访问Devtron控制台。Devtron 管理员密码。' + #13#10 +
+            '您可以cmd窗口执行以下命令获取:' + #13#10 +
             'kubectl -n devtroncd get secret devtron-secret -o jsonpath=''{.data.ADMIN_PASSWORD}''  在进行 base64 解码',
             mbInformation, MB_OK);
     end;
