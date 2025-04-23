@@ -3,7 +3,7 @@
 #define MyAppName "AlayaNeWTools"
 #define MyAppVersion "1.0"
 #define MyAppPublisher "北京九章云极科技有限公司"
-#define MyAppURL "https://www.datacanvas.com"
+#define MyAppURL "https://www.alayanew.com"
 #define MyAppExeName "AlayaNeWTools.exe"
 
 [Setup]
@@ -473,9 +473,9 @@ begin
   LogFileAdmin := ExpandConstant('{app}\adminPassword.log');
 
   // 创建临时文件
-  TempInputFile := ExpandConstant('{tmp}\admin_pwd_input.txt');
-  TempOutputFile := ExpandConstant('{tmp}\admin_pwd_output.txt');
-  BatchFile := ExpandConstant('{tmp}\decode_pwd.bat');
+  TempInputFile := ExpandConstant('{app}\admin_pwd_input.txt');
+  TempOutputFile := ExpandConstant('{app}\admin_pwd_output.txt');
+  BatchFile := ExpandConstant('{app}\decode_pwd.bat');
 
   // 使用批处理文件获取密码并解码
   SaveStringToFile(BatchFile,
@@ -558,7 +558,7 @@ begin
 end;
 
 // 修改 InstallDevtron 函数，确保 helm 命令能够读取 kubeconfig 配置
-function InstallDevtron: Boolean;
+function InstallDevtron: Boo tlean;
 var
   ResultCode: Integer;
   CmdLine: string;
@@ -582,32 +582,6 @@ begin
 
     // 创建批处理文件，显式设置 KUBECONFIG 环境变量
     TempBatchFile := ExpandConstant('{app}\devtron_install.bat');
-    // SaveStringToFile(TempBatchFile,
-      // '@echo off' + #13#10 +
-      // 'chcp 65001 > nul' + #13#10 +
-      // 'echo 开始安装 Devtron...' + #13#10 +
-      // 'cd /d "' + ExpandConstant('{app}\devtron') + '"' + #13#10 +
-      // 'set KUBECONFIG=' + KubeconfigPath + #13#10 +
-
-      // 'echo 正在尝试获取集群ID...' + #13#10 +
-      // 'for /f "tokens=*" %%a in (''"' + ExpandConstant('{app}\kubectl.exe') + '" --kubeconfig=' + KubeconfigPath + ' cluster-info'') do echo %%a >> cluster_info.txt' + #13#10 +
-      // 'type cluster_info.txt | findstr "vksid" > vksid_info.txt' + #13#10 +
-      // 'for /f "tokens=*" %%a in (vksid_info.txt) do set vksid=%%a' + #13#10 +
-      // 'if defined vksid (' + #13#10 +
-      // '  echo 找到原始vksid信息: %vksid%' + #13#10 +
-      // '  set vksid=%vksid:*vksid=%' + #13#10 +
-      // '  echo 提取后的vksid: %vksid%' + #13#10 +
-      // '  set vksid=%vksid:~1%' + #13#10 +
-      // '  echo 最终的集群ID: %vksid%' + #13#10 +
-      // ') else (' + #13#10 +
-      // '  echo 未找到vksid信息，将使用默认值' + #13#10 +
-      // '  set vksid=default-cluster' + #13#10 +
-      // ')' + #13#10 +
-      // '"' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --timeout 300s > "' + LogFile + '.output" 2>&1' + #13#10 +
-
-
-      // 'echo 安装完成，返回代码: %ERRORLEVEL%' + #13#10,
-      // False);
 
     SaveStringToFile(TempBatchFile,
       '@echo off' + #13#10 +
@@ -785,7 +759,7 @@ begin
       // 确保 kubeconfig 立即生效
       if EnsureKubeconfigWorks(DecodedFile) then
       begin
-        Log('kubeconfig 配置已成功设置并生效1hh');
+        Log('kubeconfig 配置已成功设置并生效');
       end
       else
       begin
