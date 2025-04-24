@@ -4,10 +4,11 @@
 ; 基本信息设置
 ;------------------------------------------------------------------------------
 #define MyAppName "AlayaNeWTools"
-#define MyAppVersion "1.0.4"
+#define MyAppVersion "1.0.5"
 #define MyAppPublisher "北京九章云极科技有限公司"
 #define MyAppURL "https://www.alayanew.com"
 #define MyAppExeName "AlayaNeWTools.exe"
+
 
 ;------------------------------------------------------------------------------
 ; 安装程序设置
@@ -33,6 +34,7 @@ DisableDirPage=no
 WizardSmallImageFile=D:/exe/123.bmp
 WizardImageFile=D:/exe/大.bmp
 SetupIconFile=D:/exe/favicon.ico
+VersionInfoVersion={#MyAppVersion}
 
 ;------------------------------------------------------------------------------
 ; 语言设置
@@ -387,29 +389,45 @@ begin
     TempBatchFile := ExpandConstant('{app}\devtron_install.bat');
     SaveStringToFile(TempBatchFile,
       '@echo off' + #13#10 +
+      'setlocal enabledelayedexpansion' + #13#10 +
       'chcp 65001 > nul' + #13#10 +
       'cd /d "' + ExpandConstant('{app}\devtron') + '"' + #13#10 +
       'set KUBECONFIG=' + KubeconfigPath + #13#10 +
 
-      'echo 正在获取集群ID...' + #13#10 +
-      '"' + ExpandConstant('{app}\kubectl.exe') + '" cluster-info > cluster_info.txt 2>&1' + #13#10 +
+      'echo 正在获取集群信息...' + #13#10 +
+      '"' + ExpandConstant('{app}\kubectl.exe') + '" config view > config_view.txt 2>&1' + #13#10 +
 
-      'for /f "delims=" %%a in (''type cluster_info.txt ^| find "inCluster"'') do (' + #13#10 +
-      '  for /f "tokens=8 delims=/ " %%b in ("%%a") do set vksid=%%b' + #13#10 +
+      'set "server_url="' + #13#10 +
+      'for /f "delims=" %%i in (''type config_view.txt ^| find "server:"'') do (' + #13#10 +
+      '    set "line=%%i"' + #13#10 +
+      '    for /f "tokens=1* delims= " %%a in ("!line!") do (' + #13#10 +
+      '        if /i "%%a"=="server:" (' + #13#10 +
+      '            set "server_url=%%b"' + #13#10 +
+      '            goto :server_found' + #13#10 +
+      '        )' + #13#10 +
+      '    )' + #13#10 +
+      ')' + #13#10 +
+
+      ':server_found' + #13#10 +
+      'if "!server_url!"=="" (' + #13#10 +
+      '    echo Error: Missing server field in kubeconfig' + #13#10 +
+      '    exit /b 1' + #13#10 +
       ')' + #13#10 +
 
       'echo 开始安装Devtron...' + #13#10 +
 
-      //'"' + ExpandConstant('{app}\kubectl.exe') + '" delete namespace devtroncd >> "' + LogFile + '.output" 2>&1' + #13#10 +
-      //'"' + ExpandConstant('{app}\helm.exe') + '" uninstall devtron --namespace devtroncd >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\kubectl.exe') + '" delete namespace devtroncd >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\helm.exe') + '" uninstall devtron --namespace devtroncd >> "' + LogFile + '.output" 2>&1' + #13#10 +
 
-      'if defined vksid (' + #13#10 +
-      '  "' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --set global.vksID=%vksid% --timeout 300s >> "' + LogFile + '.output" 2>&1' + #13#10 +
-      ') else (' + #13#10 +
-      '  "' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --timeout 300s >> "' + LogFile + '.output" 2>&1' + #13#10 +
-      ')' + #13#10 +
+      'for /f "tokens=2 delims=." %%a in ("!server_url!") do set "zoneID=%%a"' + #13#10 +
+      'for /f "tokens=4 delims=/" %%a in ("!server_url!") do set "vksID=%%a"' + #13#10 +
 
-      '"' + ExpandConstant('{app}\kubectl.exe') + '" create configmap devtron-global-config -n devtroncd --from-literal=vksID=%vksid% >> "' + LogFile + '.output" 2>&1' + #13#10,
+      'echo zoneID: !zoneID! >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      'echo vksID: !vksID! >> "' + LogFile + '.output" 2>&1' + #13#10 +
+
+      '"' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --set zoneID=!zoneID! --set vksID=!vksID! --set global.containerRegistry="registry.!zoneID!.alayanew.com:8443/vc-app_market/devtron" --timeout 300s >> "' + LogFile + '.output" 2>&1' + #13#10 +
+
+      '"' + ExpandConstant('{app}\kubectl.exe') + '" create configmap devtron-global-config -n devtroncd --from-literal=vksID=!vksID! >> "' + LogFile + '.output" 2>&1' + #13#10,
       False);
 
 
