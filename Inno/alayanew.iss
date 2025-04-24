@@ -4,7 +4,7 @@
 ; 基本信息设置
 ;------------------------------------------------------------------------------
 #define MyAppName "AlayaNeWTools"
-#define MyAppVersion "1.0.3"
+#define MyAppVersion "1.0.4"
 #define MyAppPublisher "北京九章云极科技有限公司"
 #define MyAppURL "https://www.alayanew.com"
 #define MyAppExeName "AlayaNeWTools.exe"
@@ -400,8 +400,8 @@ begin
 
       'echo 开始安装Devtron...' + #13#10 +
 
-      '"' + ExpandConstant('{app}\kubectl.exe') + '" delete namespace devtroncd >> "' + LogFile + '.output" 2>&1' + #13#10 +
-      '"' + ExpandConstant('{app}\helm.exe') + '" uninstall devtron --namespace devtroncd >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      //'"' + ExpandConstant('{app}\kubectl.exe') + '" delete namespace devtroncd >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      //'"' + ExpandConstant('{app}\helm.exe') + '" uninstall devtron --namespace devtroncd >> "' + LogFile + '.output" 2>&1' + #13#10 +
 
       'if defined vksid (' + #13#10 +
       '  "' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --set global.vksID=%vksid% --timeout 300s >> "' + LogFile + '.output" 2>&1' + #13#10 +
