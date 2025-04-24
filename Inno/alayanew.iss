@@ -4,7 +4,7 @@
 ; 基本信息设置
 ;------------------------------------------------------------------------------
 #define MyAppName "AlayaNeWTools"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.0.3"
 #define MyAppPublisher "北京九章云极科技有限公司"
 #define MyAppURL "https://www.alayanew.com"
 #define MyAppExeName "AlayaNeWTools.exe"
@@ -440,14 +440,14 @@ begin
     WizardForm.ProgressGauge.Max := 100;
 
     // 进度循环
-    for i := 1 to 100 do
+    for i := 1 to 110 do
     begin
       // 更新进度条
       WizardForm.ProgressGauge.Position := i;
 
       // 更新状态文本
       WizardForm.StatusLabel.Caption := '正在启动Devtron服务，请耐心等待...' +
-                                       IntToStr((i * 100) div 100) + '%';
+                                       IntToStr((i * 100) div 110) + '%';
 
       // 等待1秒
       Sleep(1000);
