@@ -412,12 +412,27 @@ begin
       '"' + ExpandConstant('{app}\kubectl.exe') + '" create configmap devtron-global-config -n devtroncd --from-literal=vksID=%vksid% >> "' + LogFile + '.output" 2>&1' + #13#10,
       False);
 
+
+    // 在执行安装命令之前添加进度条准备
+    WizardForm.ProgressGauge.Style := npbstMarquee; // 使用动态进度条样式
+    WizardForm.StatusLabel.Caption := '正在安装Devtron，需要2-3分钟，请耐心等待...';
+
     // 执行安装
     if not Exec(ExpandConstant('{cmd}'), '/c "' + TempBatchFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+
     begin
       Log('启动Devtron安装失败，错误码: ' + IntToStr(ResultCode));
+      WizardForm.ProgressGauge.Style := npbstNormal;
+      WizardForm.ProgressGauge.Position := 0;
       Exit;
     end;
+
+    // 安装完成，设置进度条为100%
+    WizardForm.ProgressGauge.Style := npbstNormal;
+    WizardForm.ProgressGauge.Position := 100;
+    WizardForm.StatusLabel.Caption := 'Devtron安装完成';
+
+
 
         // 使用WizardForm进度条替代自定义窗口
     WizardForm.StatusLabel.Caption := '正在启动Devtron服务，请耐心等待...';
