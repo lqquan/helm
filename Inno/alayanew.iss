@@ -4,7 +4,7 @@
 ; 基本信息设置
 ;------------------------------------------------------------------------------
 #define MyAppName "AlayaNeWTools"
-#define MyAppVersion "1.0.5"
+#define MyAppVersion "1.0.6"
 #define MyAppPublisher "北京九章云极科技有限公司"
 #define MyAppURL "https://www.alayanew.com"
 #define MyAppExeName "AlayaNeWTools.exe"
@@ -55,7 +55,7 @@ Source: "D:\exe\favicon.ico"; DestDir: "{app}"; DestName: "app_icon.ico"; Flags:
 ; 快捷方式设置
 ;------------------------------------------------------------------------------
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\devtron_launcher.bat"; IconFilename: "{app}\app_icon.ico"; IconIndex: 0; Comment: "启动Devtron控制台"; WorkingDir: "{app}"
 Name: "{commondesktop}\Devtron控制台"; Filename: "{app}\devtron_launcher.bat"; IconFilename: "{app}\app_icon.ico"; IconIndex: 0; Comment: "启动Devtron控制台"; WorkingDir: "{app}"
 
 ;------------------------------------------------------------------------------
