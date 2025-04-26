@@ -510,9 +510,12 @@ procedure CreateDevtronLauncherScript;
 var
   ScriptPath, ScriptContent: string;
   LogFile: string;
+  AnsiScriptFile: string;
+  ResultCode: Integer;
 begin
   ScriptPath := ExpandConstant('{app}\devtron_launcher.bat');
   LogFile := ExpandConstant('{app}\launcher_script.log');
+  AnsiScriptFile := ExpandConstant('{app}\launcher_ansi.txt');
 
   // 记录创建启动脚本
   SaveStringToFile(LogFile, '==========================================' + #13#10, True);
@@ -529,11 +532,11 @@ begin
   else
     SaveStringToFile(LogFile, '【警告】管理员密码未获取，将使用空值' + #13#10, True);
 
-  // 创建更美观的批处理文件内容
+  // 创建批处理文件内容 - 使用简单的ANSI命令
   ScriptContent :=
     '@echo off' + #13#10 +
-    'chcp 65001 > nul' + #13#10 +
-    'color 0A' + #13#10 + #13#10 +
+    'rem 首先设置代码页为简体中文GBK' + #13#10 +
+    'chcp 936 > nul' + #13#10 + #13#10 +
     'echo ============================================================' + #13#10 +
     'echo                  Devtron控制台启动工具                      ' + #13#10 +
     'echo ============================================================' + #13#10 +
@@ -541,16 +544,15 @@ begin
     'echo  正在启动Devtron控制台，请稍候...' + #13#10 +
     'echo.' + #13#10 + #13#10 +
 
-    'REM 检查URL是否存在' + #13#10 +
+    'rem 检查URL是否存在' + #13#10 +
     'if "' + Trim(DevtronUrl) + '" == "" (' + #13#10 +
-    '    color 0C' + #13#10 +
     '    echo  [错误] Devtron URL未设置，无法启动控制台' + #13#10 +
     '    echo  请联系管理员获取正确的访问地址' + #13#10 +
     '    echo.' + #13#10 +
     '    goto end' + #13#10 +
     ')' + #13#10 + #13#10 +
 
-    'REM 启动浏览器访问Devtron控制台' + #13#10 +
+    'rem 启动浏览器访问Devtron控制台' + #13#10 +
     'start "" "' + Trim(DevtronUrl) + ':22443"' + #13#10 + #13#10 +
 
     'timeout /t 2 > nul' + #13#10 +
@@ -586,15 +588,43 @@ begin
     'echo 按任意键退出...' + #13#10 +
     'pause > nul';
 
-  // 保存脚本
-  if SaveStringToFile(ScriptPath, ScriptContent, False) then
-    SaveStringToFile(LogFile, '【成功】启动脚本已创建: ' + ScriptPath + #13#10, True)
+  // 先保存为ANSI格式以支持中文(GBK)
+  if SaveStringToFile(AnsiScriptFile, ScriptContent, False) then
+  begin
+    // 创建一个转换批处理文件
+    SaveStringToFile(ExpandConstant('{app}\convert_bat.cmd'),
+      '@echo off' + #13#10 +
+      'chcp 936 > nul' + #13#10 +
+      'type "' + AnsiScriptFile + '" > "' + ScriptPath + '"' + #13#10,
+      False);
+
+    // 执行转换
+    //WizardForm.StatusLabel.Caption := '正在创建启动脚本...';
+    if Exec(ExpandConstant('{cmd}'), '/c "' + ExpandConstant('{app}\convert_bat.cmd') + '"',
+            '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    begin
+      SaveStringToFile(LogFile, '【成功】启动脚本已创建: ' + ScriptPath + #13#10, True);
+      DeleteFile(ExpandConstant('{app}\convert_bat.cmd'));
+      DeleteFile(AnsiScriptFile);
+    end
+    else
+    begin
+      SaveStringToFile(LogFile, '【错误】无法转换启动脚本，错误码: ' + IntToStr(ResultCode) + #13#10, True);
+      // 如果转换失败，直接保存原始文件
+      SaveStringToFile(ScriptPath, ScriptContent, False);
+    end;
+  end
   else
-    SaveStringToFile(LogFile, '【错误】无法创建启动脚本' + #13#10, True);
+  begin
+    SaveStringToFile(LogFile, '【错误】无法创建临时脚本文件' + #13#10, True);
+    // 直接保存脚本
+    SaveStringToFile(ScriptPath, ScriptContent, False);
+  end;
 
   SaveStringToFile(LogFile, '【完成】启动脚本创建处理完成' + #13#10, True);
   SaveStringToFile(LogFile, '==========================================' + #13#10, True);
 end;
+
 // 使用循环而不是定时器，确保进度条正常显示
 procedure ProgressSimulationWithUIUpdate(const LogFile: string);
 var
@@ -751,6 +781,7 @@ begin
   // 清理临时文件
   DeleteFile(TempBatchFile);
 end;
+
 // 更新服务启动进度
 procedure UpdateServiceProgress(Sender: TObject);
 var
@@ -939,7 +970,7 @@ begin
 
     // 在执行安装命令之前添加进度条准备
     WizardForm.ProgressGauge.Style := npbstMarquee; // 使用动态进度条样式
-    WizardForm.StatusLabel.Caption := '正在安装Devtron，需要2-3分钟，请耐心等待...';
+    WizardForm.StatusLabel.Caption := '正在安装Devtron，需要3-5分钟，请耐心等待...';
 
     SaveStringToFile(LogFile, '【安装开始】执行安装命令...' + #13#10, True);
 
@@ -970,7 +1001,7 @@ begin
       ElapsedSeconds := Round((CurrentDateTime - StartDateTime) * 24 * 60 * 60);
 
       // 更新状态文本
-      WizardForm.StatusLabel.Caption := '正在安装Devtron，需要2-3分钟，请耐心等待...（已运行' + IntToStr(ElapsedSeconds) + '秒）';
+      WizardForm.StatusLabel.Caption := '正在安装Devtron，需要3-5分钟，请耐心等待...（已运行' + IntToStr(ElapsedSeconds) + '秒）';
 
       // 每30秒记录一次等待状态
       if (ElapsedSeconds mod 30 = 0) and (ElapsedSeconds > 0) then
