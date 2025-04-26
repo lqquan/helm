@@ -745,7 +745,7 @@ begin
   if DevtronUrl = '' then
   begin
     SaveStringToFile(LogFile, '【警告】无法获取Devtron URL' + #13#10, True);
-    MsgBox('无法获取Devtron URL，请检查Devtron是否正常运行。', mbError, MB_OK);
+    //MsgBox('无法获取Devtron URL，请检查Devtron是否正常运行。', mbError, MB_OK);
   end;
 
   // 获取管理员密码
@@ -756,10 +756,10 @@ begin
   if DevtronPassword = '' then
   begin
     SaveStringToFile(LogFile, '【警告】未能获取管理员密码' + #13#10, True);
-    MsgBox('Devtron安装已完成。安装完成后，您可以通过桌面快捷方式访问Devtron控制台。' + #13#10 +
-           '无法自动获取Devtron管理员密码。您可以通过以下命令手动获取:' + #13#10 +
-           'kubectl -n devtroncd get secret devtron-secret -o jsonpath=''{.data.ADMIN_PASSWORD}''  在进行 base64 解码',
-           mbInformation, MB_OK);
+    //MsgBox('Devtron安装已完成。安装完成后，您可以通过桌面快捷方式访问Devtron控制台。' + #13#10 +
+    //       '无法自动获取Devtron管理员密码。您可以通过以下命令手动获取:' + #13#10 +
+    //       'kubectl -n devtroncd get secret devtron-secret -o jsonpath=''{.data.ADMIN_PASSWORD}''  在进行 base64 解码',
+    //       mbInformation, MB_OK);
   end
   else
   begin
@@ -799,14 +799,14 @@ begin
 
   // 更新状态文本
   WizardForm.StatusLabel.Caption := '正在启动Devtron服务，请耐心等待...' +
-                                    IntToStr((CurrentProgress * 100) div 110) + '%';
+                                     IntToStr((CurrentProgress * 100) div 100) + '%';
 
   // 增加进度
   CurrentProgress := CurrentProgress + 1;
   TTimer(Sender).Tag := CurrentProgress;
 
   // 检查是否完成
-  if CurrentProgress > 110 then
+  if CurrentProgress > 100 then
   begin
     // 停止定时器
     TTimer(Sender).Enabled := False;
@@ -879,7 +879,7 @@ begin
   WizardForm.StatusLabel.Caption := '正在启动Devtron服务，请耐心等待...';
   WizardForm.ProgressGauge.Style := npbstNormal;
   WizardForm.ProgressGauge.Min := 0;
-  WizardForm.ProgressGauge.Max := 110;
+  WizardForm.ProgressGauge.Max := 100;
 
   // 用简单方法代替计时器，确保UI更新
   // 这样我们直接使用阻塞方式但保持UI响应
