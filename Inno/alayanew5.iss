@@ -651,7 +651,7 @@ begin
   SaveStringToFile(LogFile, '【进度】开始模拟服务启动进度...' + #13#10, True);
 
   // 设置总启动时间为110秒
-  StartupSeconds := 110;
+  StartupSeconds := 100;
 
   // 使用非阻塞方式启动计时器进程
   TempBatchFile := ExpandConstant('{app}\progress_timer.bat');
@@ -970,7 +970,7 @@ begin
 
     // 在执行安装命令之前添加进度条准备
     WizardForm.ProgressGauge.Style := npbstMarquee; // 使用动态进度条样式
-    WizardForm.StatusLabel.Caption := '正在安装Devtron，需要3-5分钟，请耐心等待...';
+    WizardForm.StatusLabel.Caption := '正在安装Devtron，需要2-3分钟，请耐心等待...';
 
     SaveStringToFile(LogFile, '【安装开始】执行安装命令...' + #13#10, True);
 
@@ -1001,7 +1001,7 @@ begin
       ElapsedSeconds := Round((CurrentDateTime - StartDateTime) * 24 * 60 * 60);
 
       // 更新状态文本
-      WizardForm.StatusLabel.Caption := '正在安装Devtron，需要3-5分钟，请耐心等待...（已运行' + IntToStr(ElapsedSeconds) + '秒）';
+      WizardForm.StatusLabel.Caption := '正在安装Devtron，需要2-3分钟，请耐心等待...（已运行' + IntToStr(ElapsedSeconds) + '秒）';
 
       // 每30秒记录一次等待状态
       if (ElapsedSeconds mod 30 = 0) and (ElapsedSeconds > 0) then
