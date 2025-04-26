@@ -603,62 +603,94 @@ var
   ResultCode: Integer;
   OutputContent: AnsiString;
   KubeconfigPath: string;
-  SmallSteps: Integer;
-  TotalSteps: Integer;
-  StartTime: TDateTime;
-  ElapsedSeconds: Integer;
+  StartTime, CurrentDateTime: TDateTime;
+  ElapsedSeconds, CurrentElapsed: Integer;
+  StartupSeconds: Integer;
+  CompleteFlagFile: string;
+  ProgressValue: Integer;
 begin
   KubeconfigPath := ExpandConstant('{app}\kubeconfig');
   StartTime := Now;
+  CompleteFlagFile := ExpandConstant('{app}\progress_complete.flag');
 
-  // 设置总共要走的小步数 - 总共110秒，但每个小步为0.1秒
-  TotalSteps := 110 * 10; // 1100个小步
+  // 删除标记文件（如果存在）
+  if FileExists(CompleteFlagFile) then
+    DeleteFile(CompleteFlagFile);
 
   // 记录进度条开始
   SaveStringToFile(LogFile, '【进度】开始模拟服务启动进度...' + #13#10, True);
 
-  for SmallSteps := 1 to TotalSteps do
+  // 设置总启动时间为110秒
+  StartupSeconds := 110;
+
+  // 使用非阻塞方式启动计时器进程
+  TempBatchFile := ExpandConstant('{app}\progress_timer.bat');
+  SaveStringToFile(TempBatchFile,
+    '@echo off' + #13#10 +
+    'for /L %%i in (1,1,' + IntToStr(StartupSeconds) + ') do (' + #13#10 +
+    '  ping -n 2 127.0.0.1 > nul' + #13#10 +  // 使用ping作为延时约1秒
+    ')' + #13#10 +
+    'echo complete > "' + CompleteFlagFile + '"' + #13#10,
+    False);
+
+  // 启动计时器但不等待
+  ShellExec('', ExpandConstant('{cmd}'), '/c "' + TempBatchFile + '"', '', SW_HIDE, ewNoWait, ResultCode);
+
+  // 初始化进度条
+  WizardForm.ProgressGauge.Style := npbstNormal;
+  WizardForm.ProgressGauge.Min := 0;
+  WizardForm.ProgressGauge.Max := 100;
+  WizardForm.ProgressGauge.Position := 0;
+
+  i := 0;  // 当前进度
+
+  // 循环直到计时器完成
+  while not FileExists(CompleteFlagFile) do
   begin
-    // 计算当前进度（1-110）
-    i := SmallSteps div 10;
-    if i < 1 then i := 1;
-    if i > 110 then i := 110;
+    // 计算当前进度
+    CurrentDateTime := Now;
+    CurrentElapsed := Round((CurrentDateTime - StartTime) * 24 * 60 * 60);
+
+    // 安全计算进度，避免超过100%
+    ProgressValue := CurrentElapsed * 100 div StartupSeconds;
+    if ProgressValue > 100 then
+      ProgressValue := 100;
+    i := ProgressValue;
 
     // 更新进度条
     WizardForm.ProgressGauge.Position := i;
 
-    // 更新状态文本，但不要每个小步都更新，而是每10个小步更新一次
-    if (SmallSteps mod 10) = 0 then
-    begin
-      WizardForm.StatusLabel.Caption := '正在启动Devtron服务，请耐心等待...' +
-                                      IntToStr((i * 100) div 110) + '%';
+    // 更新状态文本
+    WizardForm.StatusLabel.Caption := '正在启动Devtron服务，请耐心等待...' + IntToStr(i) + '%';
 
-      // 每10%记录一次日志
-      if (i mod 11) = 0 then
-        SaveStringToFile(LogFile, '【进度】服务启动进度: ' + IntToStr((i * 100) div 110) + '%' + #13#10, True);
-    end;
+    // 记录日志
+    if (CurrentElapsed mod 10 = 0) and (CurrentElapsed > 0) then
+      SaveStringToFile(LogFile, '【进度】服务启动进度: ' + IntToStr(i) + '%，已运行' + IntToStr(CurrentElapsed) + '秒' + #13#10, True);
 
     // 处理Windows消息以保持UI响应
     Application.ProcessMessages;
 
-    // 短暂休眠，减少CPU使用但保持UI流畅
-    Sleep(100); // 每0.1秒更新一次，但总时间仍为110秒
+    // 短暂休眠
+    Sleep(200);
   end;
 
-  // 确保进度条显示100%
-  WizardForm.ProgressGauge.Position := 110;
+  // 进度完成
+  WizardForm.ProgressGauge.Position := 100;
   WizardForm.StatusLabel.Caption := '正在完成Devtron服务启动...100%';
   SaveStringToFile(LogFile, '【进度】服务启动进度: 100%' + #13#10, True);
+
+  // 删除标记文件
+  DeleteFile(CompleteFlagFile);
 
   // 完成服务启动，获取URL和密码
   SaveStringToFile(LogFile, '【获取信息】正在获取Devtron URL和密码...' + #13#10, True);
 
-  TempBatchFile := ExpandConstant('{tmp}\get_devtron_url.bat');
+  TempBatchFile := ExpandConstant('{app}\get_devtron_url.bat');
   SaveStringToFile(TempBatchFile,
     '@echo off' + #13#10 +
     'chcp 65001 > nul' + #13#10 +
     'set KUBECONFIG=' + KubeconfigPath + #13#10 +
-    'echo [命令] kubectl describe serviceexporter devtron-itf -n devtroncd > "' + LogFile + '.command" 2>&1' + #13#10 +
+    'echo [命令] kubectl describe serviceexporter devtron-itf -n devtroncd > "' + ExpandConstant('{app}\url_command.log') + '" 2>&1' + #13#10 +
     '"' + ExpandConstant('{app}\kubectl.exe') + '" describe serviceexporter devtron-itf -n devtroncd > "' +
     ExpandConstant('{app}\devtron_url.txt') + '" 2>&1' + #13#10,
     False);
@@ -752,11 +784,12 @@ begin
     KubeconfigPath := ExpandConstant('{app}\kubeconfig');
 
     // 获取Devtron URL
-    TempBatchFile := ExpandConstant('{tmp}\get_devtron_url.bat');
+    TempBatchFile := ExpandConstant('{app}\get_devtron_url.bat');
     SaveStringToFile(TempBatchFile,
       '@echo off' + #13#10 +
       'chcp 65001 > nul' + #13#10 +
       'set KUBECONFIG=' + KubeconfigPath + #13#10 +
+      'echo [命令] kubectl describe serviceexporter devtron-itf -n devtroncd > "' + ExpandConstant('{app}\url_command.log') + '" 2>&1' + #13#10 +
       '"' + ExpandConstant('{app}\kubectl.exe') + '" describe serviceexporter devtron-itf -n devtroncd > "' +
       ExpandConstant('{app}\devtron_url.txt') + '" 2>&1' + #13#10,
       False);
@@ -906,7 +939,7 @@ begin
 
     // 在执行安装命令之前添加进度条准备
     WizardForm.ProgressGauge.Style := npbstMarquee; // 使用动态进度条样式
-    WizardForm.StatusLabel.Caption := '正在安装Devtron，需要3-5分钟，请耐心等待...';
+    WizardForm.StatusLabel.Caption := '正在安装Devtron，需要2-3分钟，请耐心等待...';
 
     SaveStringToFile(LogFile, '【安装开始】执行安装命令...' + #13#10, True);
 
@@ -937,7 +970,7 @@ begin
       ElapsedSeconds := Round((CurrentDateTime - StartDateTime) * 24 * 60 * 60);
 
       // 更新状态文本
-      WizardForm.StatusLabel.Caption := '正在安装Devtron，需要3-5分钟，请耐心等待...（已运行' + IntToStr(ElapsedSeconds) + '秒）';
+      WizardForm.StatusLabel.Caption := '正在安装Devtron，需要2-3分钟，请耐心等待...（已运行' + IntToStr(ElapsedSeconds) + '秒）';
 
       // 每30秒记录一次等待状态
       if (ElapsedSeconds mod 30 = 0) and (ElapsedSeconds > 0) then
