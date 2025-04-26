@@ -1,0 +1,1058 @@
+#include <D:\Program Files (x86)\Inno Download Plugin\idp.iss>
+
+;------------------------------------------------------------------------------
+; 基本信息设置
+;------------------------------------------------------------------------------
+#define MyAppName "AlayaNeWTools"
+#define MyAppVersion "1.0.6"
+#define MyAppPublisher "北京九章云极科技有限公司"
+#define MyAppURL "https://www.alayanew.com"
+#define MyAppExeName "AlayaNeWTools.exe"
+
+
+;------------------------------------------------------------------------------
+; 安装程序设置
+;------------------------------------------------------------------------------
+[Setup]
+AppId={{GUID-生成一个唯一ID}}
+AppName={#MyAppName}
+AppVersion={#MyAppVersion}
+AppPublisher={#MyAppPublisher}
+AppPublisherURL={#MyAppURL}
+AppSupportURL={#MyAppURL}
+AppUpdatesURL={#MyAppURL}
+DefaultDirName=AlayaNewTools
+DefaultGroupName={#MyAppName}
+AllowNoIcons=yes
+OutputDir=Output
+OutputBaseFilename=AlayaNeWTools
+Compression=lzma
+SolidCompression=yes
+WizardStyle=modern
+PrivilegesRequired=admin
+DisableDirPage=no
+WizardSmallImageFile=D:/exe/123.bmp
+WizardImageFile=D:/exe/大.bmp
+SetupIconFile=D:/exe/favicon.ico
+VersionInfoVersion={#MyAppVersion}
+DefaultDialogFontName=Microsoft YaHei
+
+;------------------------------------------------------------------------------
+; 语言设置
+;------------------------------------------------------------------------------
+[Languages]
+Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+;------------------------------------------------------------------------------
+; 文件设置
+;------------------------------------------------------------------------------
+[Files]
+Source: "D:\exe\kubectl.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "D:\exe\helm.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "D:\exe\devtron\*"; DestDir: "{app}\devtron"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "D:\exe\favicon.ico"; DestDir: "{app}"; DestName: "app_icon.ico"; Flags: ignoreversion
+
+;------------------------------------------------------------------------------
+; 快捷方式设置
+;------------------------------------------------------------------------------
+[Icons]
+Name: "{group}\{#MyAppName}"; Filename: "{app}\devtron_launcher.bat"; IconFilename: "{app}\app_icon.ico"; IconIndex: 0; Comment: "启动Devtron控制台"; WorkingDir: "{app}"
+Name: "{commondesktop}\Devtron控制台"; Filename: "{app}\devtron_launcher.bat"; IconFilename: "{app}\app_icon.ico"; IconIndex: 0; Comment: "启动Devtron控制台"; WorkingDir: "{app}"
+
+;------------------------------------------------------------------------------
+; 代码部分
+;------------------------------------------------------------------------------
+[Code]
+var
+  KubeconfigPage: TInputFileWizardPage;
+  DevtronUrl: string;
+  DevtronPassword: string;
+  InstallTimer: TTimer;
+
+// 前向声明
+procedure ProcessInstallComplete; forward;
+procedure UpdateServiceProgress(Sender: TObject); forward;
+
+//------------------------------------------------------------------------------
+// UI 相关函数
+//------------------------------------------------------------------------------
+
+// 创建自定义页面
+procedure InitializeWizard;
+begin
+  KubeconfigPage := CreateInputFilePage(wpSelectDir,
+    '选择Kubeconfig文件',
+    '请选择您的Kubeconfig文件，该文件将被配置为环境变量。此步骤是必需的。',
+    '选择文件:');
+  KubeconfigPage.Add('Kubeconfig文件 (必需):', 'JSON files|*.json|YAML files|*.yaml|YML files|*.yml|All files|*.*', '.json');
+end;
+
+// 验证用户是否选择了文件
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if CurPageID = KubeconfigPage.ID then
+  begin
+    if (KubeconfigPage.Values[0] = '') or (not FileExists(KubeconfigPage.Values[0])) then
+    begin
+      MsgBox('请选择有效的Kubeconfig文件。此步骤是必需的，无法继续安装。', mbError, MB_OK);
+      Result := False;
+    end;
+  end;
+end;
+
+//------------------------------------------------------------------------------
+// 文件和环境变量处理函数
+//------------------------------------------------------------------------------
+
+// Base64解码文件
+function Base64DecodeFile(const InputFile, OutputFile: string): Boolean;
+var
+  ResultCode: Integer;
+  TempOutputFile: string;
+  LogFile: string;
+begin
+  Result := False;
+  LogFile := ExpandConstant('{app}\base64_decode.log');
+  TempOutputFile := ExpandConstant('{app}\kubeconfig_temp');
+
+  // 初始化日志
+  SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+  SaveStringToFile(LogFile, '【开始】Base64解码文件 - ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + #13#10, True);
+  SaveStringToFile(LogFile, '【参数】输入文件: ' + InputFile + #13#10, True);
+  SaveStringToFile(LogFile, '【参数】输出文件: ' + OutputFile + #13#10, True);
+  SaveStringToFile(LogFile, '【参数】临时文件: ' + TempOutputFile + #13#10, True);
+
+  Log('执行Base64解码: ' + InputFile);
+
+  // 检查输入文件是否存在
+  if not FileExists(InputFile) then
+  begin
+    Log('输入文件不存在: ' + InputFile);
+    SaveStringToFile(LogFile, '【错误】输入文件不存在: ' + InputFile + #13#10, True);
+    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+    MsgBox('Base64解码失败：输入文件不存在。', mbError, MB_OK);
+    Exit;
+  end;
+
+  // 执行certutil命令进行解码
+  SaveStringToFile(LogFile, '【步骤1】执行certutil命令进行Base64解码' + #13#10, True);
+  SaveStringToFile(LogFile, '【命令】certutil -decode "' + InputFile + '" "' + TempOutputFile + '"' + #13#10, True);
+
+  if not Exec('certutil.exe', '-decode "' + InputFile + '" "' + TempOutputFile + '"',
+              '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    Log('certutil命令执行失败，错误码: ' + IntToStr(ResultCode));
+    SaveStringToFile(LogFile, '【错误】certutil命令执行失败，错误码: ' + IntToStr(ResultCode) + #13#10, True);
+    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+    MsgBox('无法执行certutil命令，请确认是否安装了证书工具。若未安装，请先安装证书工具后再试。', mbError, MB_OK);
+    Exit;
+  end;
+
+  // 检查命令执行结果
+  SaveStringToFile(LogFile, '【结果】certutil命令执行完成，返回码: ' + IntToStr(ResultCode) + #13#10, True);
+  if ResultCode <> 0 then
+  begin
+    Log('解码失败，返回码: ' + IntToStr(ResultCode));
+    SaveStringToFile(LogFile, '【错误】解码失败，返回码: ' + IntToStr(ResultCode) + #13#10, True);
+    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+    MsgBox('文件解码失败，可能不是有效的Base64格式。请确认提供的是正确的kubeconfig文件。', mbError, MB_OK);
+    Exit;
+  end;
+
+  // 验证解码结果
+  SaveStringToFile(LogFile, '【步骤2】验证解码后的文件是否存在' + #13#10, True);
+  if not FileExists(TempOutputFile) then
+  begin
+    Log('解码后文件不存在');
+    SaveStringToFile(LogFile, '【错误】解码后文件不存在: ' + TempOutputFile + #13#10, True);
+    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+    MsgBox('解码后的文件未创建。请检查您是否有足够的磁盘空间和写入权限。', mbError, MB_OK);
+    Exit;
+  end;
+
+  // 复制解码后的文件到目标位置
+  SaveStringToFile(LogFile, '【步骤3】将解码后的文件复制到目标位置' + #13#10, True);
+  if not FileCopy(TempOutputFile, OutputFile, False) then
+  begin
+    Log('无法复制文件到目标位置');
+    SaveStringToFile(LogFile, '【错误】无法复制文件到目标位置: ' + OutputFile + #13#10, True);
+    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+    MsgBox('无法将解码后的文件复制到目标位置。请检查目标路径是否可写或有足够权限。', mbError, MB_OK);
+    Exit;
+  end;
+
+  // 清理临时文件
+  SaveStringToFile(LogFile, '【步骤4】清理临时文件' + #13#10, True);
+  if not DeleteFile(TempOutputFile) then
+    SaveStringToFile(LogFile, '【警告】无法删除临时文件: ' + TempOutputFile + #13#10, True);
+
+  // 验证目标文件是否有效
+  SaveStringToFile(LogFile, '【步骤5】检查最终生成的文件' + #13#10, True);
+  if not FileExists(OutputFile) then
+  begin
+    SaveStringToFile(LogFile, '【错误】最终文件不存在: ' + OutputFile + #13#10, True);
+    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+    Exit;
+  end;
+
+  // 解码成功
+  Result := True;
+  Log('文件解码成功: ' + OutputFile);
+  SaveStringToFile(LogFile, '【成功】文件Base64解码完成' + #13#10, True);
+  SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+end;
+
+// 添加到系统PATH环境变量
+procedure AddToSystemPathEnvironmentVariable(const Value: string);
+var
+  CurrentPath, NewPath: string;
+begin
+  if RegQueryStringValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'Path', CurrentPath) then
+  begin
+    if Pos(LowerCase(Value), LowerCase(CurrentPath)) = 0 then
+    begin
+      if (Length(CurrentPath) > 0) and (CurrentPath[Length(CurrentPath)] <> ';') then
+        CurrentPath := CurrentPath + ';';
+
+      NewPath := CurrentPath + Value;
+
+      if not RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'Path', NewPath) then
+        Log('无法更新PATH环境变量');
+    end;
+  end else begin
+    if not RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'Path', Value) then
+      Log('无法创建PATH环境变量');
+  end;
+end;
+
+// 设置系统环境变量
+procedure SetSystemEnvironmentVariable(const Name, Value: string);
+begin
+  if not RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', Name, Value) then
+    Log('无法设置环境变量: ' + Name);
+end;
+
+// 确保kubeconfig配置生效
+function EnsureKubeconfigWorks(const KubeconfigPath: string): Boolean;
+var
+  ResultCode: Integer;
+  TempBatchFile: string;
+begin
+  Result := False;
+  TempBatchFile := ExpandConstant('{app}\ensure_kubeconfig.bat');
+
+  SaveStringToFile(TempBatchFile,
+    '@echo off' + #13#10 +
+    'chcp 65001 > nul' + #13#10 +
+    'set KUBECONFIG=' + KubeconfigPath + #13#10 +
+    'setx KUBECONFIG "' + KubeconfigPath + '" /M > nul' + #13#10 +
+    '"' + ExpandConstant('{app}\kubectl.exe') + '" config view > "' + ExpandConstant('{app}\kubectl_config_test.txt') + '" 2>&1' + #13#10,
+    False);
+
+  Result := Exec(ExpandConstant('{cmd}'), '/c "' + TempBatchFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+  DeleteFile(TempBatchFile);
+  DeleteFile(ExpandConstant('{app}\kubectl_config_test.txt'));
+end;
+
+//------------------------------------------------------------------------------
+// 命令执行和输出处理函数
+//------------------------------------------------------------------------------
+
+// 执行命令并获取输出
+function ExecAndGetOutput(const Command, Params: string): string;
+var
+  OutputFile, BatchFile: string;
+  ResultCode: Integer;
+  Output: AnsiString;
+begin
+  Result := '';
+  OutputFile := ExpandConstant('{app}\cmd_output.txt');
+  BatchFile := ExpandConstant('{app}\run_cmd.bat');
+
+  // 创建批处理文件
+  SaveStringToFile(BatchFile,
+    '@echo off' + #13#10 +
+    'chcp 65001 > nul' + #13#10 +
+    '"' + Command + '" ' + Params + ' > "' + OutputFile + '" 2>&1' + #13#10,
+    False);
+
+  // 执行批处理
+  if Exec(ExpandConstant('{cmd}'), '/c "' + BatchFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    Sleep(2000); // 等待文件写入完成
+
+    if FileExists(OutputFile) and LoadStringFromFile(OutputFile, Output) then
+      Result := Output;
+  end;
+
+  // 清理文件
+  DeleteFile(BatchFile);
+  DeleteFile(OutputFile);
+end;
+
+// 从输出中提取Devtron URL
+function ExtractDevtronUrl(const Output: string): string;
+var
+  UrlPos, UrlEnd: Integer;
+  SearchStrings: array[0..2] of string;
+  i: Integer;
+  LogFile: string;
+begin
+  Result := '';
+  LogFile := ExpandConstant('{app}\url_extract.log');
+
+  // 记录URL提取开始
+  SaveStringToFile(LogFile, '==========================================' + #13#10, True);
+  SaveStringToFile(LogFile, '【开始】提取Devtron URL - ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + #13#10, True);
+
+  // 记录输入内容的一部分（避免日志过大）
+  if Length(Output) > 200 then
+    SaveStringToFile(LogFile, '【输入】输入内容(前200字符): ' + Copy(Output, 1, 200) + '...' + #13#10, True)
+  else
+    SaveStringToFile(LogFile, '【输入】输入内容: ' + Output + #13#10, True);
+
+  // 定义可能的搜索字符串（按优先级排序）
+  SaveStringToFile(LogFile, '【处理】定义用于搜索URL的字符串模式' + #13#10, True);
+  SearchStrings[0] := 'IngressRoute successfully updated, url: https://';
+  SearchStrings[1] := 'url: https://';
+  SearchStrings[2] := 'https://';
+
+  // 尝试每个搜索字符串
+  for i := 0 to 2 do
+  begin
+    SaveStringToFile(LogFile, '【搜索】尝试使用模式 [' + IntToStr(i) + ']: ' + SearchStrings[i] + #13#10, True);
+    UrlPos := Pos(SearchStrings[i], Output);
+
+    if UrlPos > 0 then
+    begin
+      SaveStringToFile(LogFile, '【匹配】在位置 ' + IntToStr(UrlPos) + ' 找到匹配' + #13#10, True);
+
+      // 调整位置到https://开始处
+      UrlPos := UrlPos + Length(SearchStrings[i]) - Length('https://');
+      SaveStringToFile(LogFile, '【调整】URL起始位置调整为: ' + IntToStr(UrlPos) + #13#10, True);
+
+      // 查找URL结束位置（使用多种可能的终止符）
+      UrlEnd := Pos(' ', Copy(Output, UrlPos, Length(Output)));
+      if UrlEnd = 0 then
+      begin
+        SaveStringToFile(LogFile, '【搜索】查找空格作为URL终止符未找到，尝试回车符' + #13#10, True);
+        UrlEnd := Pos(#13, Copy(Output, UrlPos, Length(Output)));
+      end;
+
+      if UrlEnd = 0 then
+      begin
+        SaveStringToFile(LogFile, '【搜索】查找回车符作为URL终止符未找到，尝试换行符' + #13#10, True);
+        UrlEnd := Pos(#10, Copy(Output, UrlPos, Length(Output)));
+      end;
+
+      if UrlEnd = 0 then
+      begin
+        SaveStringToFile(LogFile, '【搜索】未找到URL终止符，使用剩余全部文本作为URL' + #13#10, True);
+        UrlEnd := Length(Output) - UrlPos + 1;
+      end
+      else
+      begin
+        SaveStringToFile(LogFile, '【搜索】找到URL终止符，位置为: ' + IntToStr(UrlEnd) + #13#10, True);
+        UrlEnd := UrlEnd - 1;
+      end;
+
+      // 提取URL
+      Result := Copy(Output, UrlPos, UrlEnd);
+      SaveStringToFile(LogFile, '【提取】提取的URL: ' + Result + #13#10, True);
+
+      // 检查并添加端口号（如果需要）
+      if Pos(':', Result) = 0 then
+      begin
+        SaveStringToFile(LogFile, '【端口】URL中未包含端口号，添加默认端口22443' + #13#10, True);
+        Result := Result + ':22443';
+      end;
+
+      SaveStringToFile(LogFile, '【结果】最终URL: ' + Result + #13#10, True);
+      Break;
+    end
+    else
+    begin
+      SaveStringToFile(LogFile, '【结果】未找到匹配模式' + #13#10, True);
+    end;
+  end;
+
+  if Result = '' then
+  begin
+    SaveStringToFile(LogFile, '【警告】未能从输出中找到URL' + #13#10, True);
+    Log('未能从输出中找到URL');
+  end;
+
+  SaveStringToFile(LogFile, '【完成】URL提取处理完成' + #13#10, True);
+  SaveStringToFile(LogFile, '==========================================' + #13#10, True);
+end;
+
+//------------------------------------------------------------------------------
+// Devtron相关函数
+//------------------------------------------------------------------------------
+
+// 获取Devtron管理员密码
+function GetDevtronAdminPassword: string;
+var
+  BatchFile, TempInputFile, TempOutputFile: string;
+  ResultCode: Integer;
+  OutputContent: AnsiString;
+  LogFileAdmin: string;
+begin
+  Result := '';
+
+  // 初始化文件路径
+  TempInputFile := ExpandConstant('{app}\admin_pwd_input.txt');
+  TempOutputFile := ExpandConstant('{app}\admin_pwd_output.txt');
+  BatchFile := ExpandConstant('{app}\get_admin_pwd.bat');
+  LogFileAdmin := ExpandConstant('{app}\adminPassword.log');
+
+  // 记录操作日志
+  SaveStringToFile(LogFileAdmin, '==========================================' + #13#10, True);
+  SaveStringToFile(LogFileAdmin, '【开始】获取管理员密码 - ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + #13#10, True);
+
+  // 创建批处理文件
+  SaveStringToFile(LogFileAdmin, '【步骤1】创建获取密码的批处理文件' + #13#10, True);
+  SaveStringToFile(BatchFile,
+    '@echo off' + #13#10 +
+    'chcp 65001 > nul' + #13#10 +
+    'echo [时间] ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + ' > "' + LogFileAdmin + '.output"' + #13#10 +
+    'echo [命令] 开始执行获取管理员密码命令 >> "' + LogFileAdmin + '.output"' + #13#10 +
+    'set KUBECONFIG=' + ExpandConstant('{app}\kubeconfig') + #13#10 +
+    'echo [命令] kubectl -n devtroncd get secret devtron-secret... >> "' + LogFileAdmin + '.output"' + #13#10 +
+    '"' + ExpandConstant('{app}\kubectl.exe') + '" -n devtroncd get secret devtron-secret -o jsonpath="{.data.ADMIN_PASSWORD}" > "' + TempInputFile + '" 2>&1' + #13#10 +
+    'if %ERRORLEVEL% NEQ 0 (' + #13#10 +
+    '  echo [错误] 执行kubectl命令失败，错误代码: %ERRORLEVEL% >> "' + LogFileAdmin + '.output"' + #13#10 +
+    '  exit /b %ERRORLEVEL%' + #13#10 +
+    ')' + #13#10 +
+    'if exist "' + TempInputFile + '" (' + #13#10 +
+    '  echo [命令] 对密码进行base64解码 >> "' + LogFileAdmin + '.output"' + #13#10 +
+    '  certutil -decode "' + TempInputFile + '" "' + TempOutputFile + '" > nul' + #13#10 +
+    '  if %ERRORLEVEL% NEQ 0 (' + #13#10 +
+    '    echo [错误] base64解码失败，尝试PowerShell方式解码 >> "' + LogFileAdmin + '.output"' + #13#10 +
+    '  ) else (' + #13#10 +
+    '    echo [信息] base64解码成功 >> "' + LogFileAdmin + '.output"' + #13#10 +
+    '  )' + #13#10 +
+    ')' + #13#10 +
+    'echo [完成] 命令执行结束 >> "' + LogFileAdmin + '.output"' + #13#10,
+    False);
+
+  // 执行批处理
+  SaveStringToFile(LogFileAdmin, '【步骤2】执行批处理文件' + #13#10, True);
+
+  if Exec(ExpandConstant('{cmd}'), '/c "' + BatchFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    SaveStringToFile(LogFileAdmin, '【步骤2】批处理执行完成，返回代码: ' + IntToStr(ResultCode) + #13#10, True);
+
+    // 尝试读取密码
+    if FileExists(TempOutputFile) and LoadStringFromFile(TempOutputFile, OutputContent) then
+    begin
+      Result := Trim(OutputContent);
+      SaveStringToFile(LogFileAdmin, '【步骤3】从certutil解码后的文件读取密码成功' + #13#10, True);
+    end
+    else if FileExists(TempInputFile) and LoadStringFromFile(TempInputFile, OutputContent) then
+    begin
+      SaveStringToFile(LogFileAdmin, '【步骤3】certutil解码失败，尝试使用PowerShell解码' + #13#10, True);
+
+      // 尝试使用PowerShell解码
+      SaveStringToFile(BatchFile,
+        '@echo off' + #13#10 +
+        'chcp 65001 > nul' + #13#10 +
+        'echo [命令] 使用PowerShell进行base64解码 >> "' + LogFileAdmin + '.output"' + #13#10 +
+        'powershell -Command "[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(''' + Trim(OutputContent) + '''))" > "' + TempOutputFile + '"' + #13#10 +
+        'if %ERRORLEVEL% NEQ 0 (' + #13#10 +
+        '  echo [错误] PowerShell解码失败，错误代码: %ERRORLEVEL% >> "' + LogFileAdmin + '.output"' + #13#10 +
+        ') else (' + #13#10 +
+        '  echo [信息] PowerShell解码成功 >> "' + LogFileAdmin + '.output"' + #13#10 +
+        ')' + #13#10,
+        False);
+
+      if Exec(ExpandConstant('{cmd}'), '/c "' + BatchFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and
+         FileExists(TempOutputFile) and LoadStringFromFile(TempOutputFile, OutputContent) then
+      begin
+        Result := Trim(OutputContent);
+        SaveStringToFile(LogFileAdmin, '【步骤4】从PowerShell解码后的文件读取密码成功' + #13#10, True);
+      end
+      else
+      begin
+        SaveStringToFile(LogFileAdmin, '【错误】PowerShell解码失败，无法获取管理员密码' + #13#10, True);
+      end;
+    end
+    else
+    begin
+      SaveStringToFile(LogFileAdmin, '【错误】未找到包含密码的输入文件，获取密码失败' + #13#10, True);
+    end;
+  end
+  else
+  begin
+    SaveStringToFile(LogFileAdmin, '【错误】执行批处理文件失败，返回代码: ' + IntToStr(ResultCode) + #13#10, True);
+  end;
+
+  // 记录结果
+  if Result <> '' then
+    SaveStringToFile(LogFileAdmin, '【完成】成功获取管理员密码' + #13#10, True)
+  else
+    SaveStringToFile(LogFileAdmin, '【失败】未能获取管理员密码' + #13#10, True);
+
+  SaveStringToFile(LogFileAdmin, '==========================================' + #13#10, True);
+
+  // 清理临时文件
+  DeleteFile(TempInputFile);
+  DeleteFile(TempOutputFile);
+  DeleteFile(BatchFile);
+end;
+
+// 创建Devtron启动脚本
+procedure CreateDevtronLauncherScript;
+var
+  ScriptPath, ScriptContent: string;
+  LogFile: string;
+begin
+  ScriptPath := ExpandConstant('{app}\devtron_launcher.bat');
+  LogFile := ExpandConstant('{app}\launcher_script.log');
+
+  // 记录创建启动脚本
+  SaveStringToFile(LogFile, '==========================================' + #13#10, True);
+  SaveStringToFile(LogFile, '【开始】创建Devtron启动脚本 - ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + #13#10, True);
+
+  // 记录URL和密码状态
+  if DevtronUrl <> '' then
+    SaveStringToFile(LogFile, '【信息】使用URL: ' + DevtronUrl + #13#10, True)
+  else
+    SaveStringToFile(LogFile, '【警告】URL未获取，将使用空值' + #13#10, True);
+
+  if DevtronPassword <> '' then
+    SaveStringToFile(LogFile, '【信息】管理员密码已获取' + #13#10, True)
+  else
+    SaveStringToFile(LogFile, '【警告】管理员密码未获取，将使用空值' + #13#10, True);
+
+  // 创建更美观的批处理文件内容
+  ScriptContent :=
+    '@echo off' + #13#10 +
+    'chcp 65001 > nul' + #13#10 +
+    'color 0A' + #13#10 + #13#10 +
+    'echo ============================================================' + #13#10 +
+    'echo                  Devtron控制台启动工具                      ' + #13#10 +
+    'echo ============================================================' + #13#10 +
+    'echo.' + #13#10 +
+    'echo  正在启动Devtron控制台，请稍候...' + #13#10 +
+    'echo.' + #13#10 + #13#10 +
+
+    'REM 检查URL是否存在' + #13#10 +
+    'if "' + Trim(DevtronUrl) + '" == "" (' + #13#10 +
+    '    color 0C' + #13#10 +
+    '    echo  [错误] Devtron URL未设置，无法启动控制台' + #13#10 +
+    '    echo  请联系管理员获取正确的访问地址' + #13#10 +
+    '    echo.' + #13#10 +
+    '    goto end' + #13#10 +
+    ')' + #13#10 + #13#10 +
+
+    'REM 启动浏览器访问Devtron控制台' + #13#10 +
+    'start "" "' + Trim(DevtronUrl) + ':22443"' + #13#10 + #13#10 +
+
+    'timeout /t 2 > nul' + #13#10 +
+    'cls' + #13#10 +
+    'echo ============================================================' + #13#10 +
+    'echo                 Devtron控制台已启动                         ' + #13#10 +
+    'echo ============================================================' + #13#10 +
+    'echo.' + #13#10 +
+    'echo  Devtron控制台已在浏览器中打开' + #13#10 +
+    'echo.' + #13#10 +
+    'echo  [访问信息]' + #13#10 +
+    'echo  访问地址: ' + Trim(DevtronUrl) + ':22443' + #13#10 +
+    'echo  管理员账户: admin' + #13#10;
+
+  // 根据是否获取到密码添加不同的内容
+  if DevtronPassword <> '' then
+    ScriptContent := ScriptContent +
+    'echo  管理员密码: ' + DevtronPassword + #13#10
+  else
+    ScriptContent := ScriptContent +
+    'echo  管理员密码: [未获取] 请通过以下命令获取:' + #13#10 +
+    'echo  kubectl -n devtroncd get secret devtron-secret -o jsonpath=''{.data.ADMIN_PASSWORD}''' + #13#10 +
+    'echo  并进行base64解码' + #13#10;
+
+  // 添加结尾
+  ScriptContent := ScriptContent +
+    'echo.' + #13#10 +
+    'echo  如需再次打开控制台，请重新运行此脚本' + #13#10 +
+    'echo.' + #13#10 +
+    'echo ============================================================' + #13#10 +
+    ':end' + #13#10 +
+    'echo.' + #13#10 +
+    'echo 按任意键退出...' + #13#10 +
+    'pause > nul';
+
+  // 保存脚本
+  if SaveStringToFile(ScriptPath, ScriptContent, False) then
+    SaveStringToFile(LogFile, '【成功】启动脚本已创建: ' + ScriptPath + #13#10, True)
+  else
+    SaveStringToFile(LogFile, '【错误】无法创建启动脚本' + #13#10, True);
+
+  SaveStringToFile(LogFile, '【完成】启动脚本创建处理完成' + #13#10, True);
+  SaveStringToFile(LogFile, '==========================================' + #13#10, True);
+end;
+// 使用循环而不是定时器，确保进度条正常显示
+procedure ProgressSimulationWithUIUpdate(const LogFile: string);
+var
+  i: Integer;
+  TempBatchFile: string;
+  ResultCode: Integer;
+  OutputContent: AnsiString;
+  KubeconfigPath: string;
+  SmallSteps: Integer;
+  TotalSteps: Integer;
+  StartTime: TDateTime;
+  ElapsedSeconds: Integer;
+begin
+  KubeconfigPath := ExpandConstant('{app}\kubeconfig');
+  StartTime := Now;
+
+  // 设置总共要走的小步数 - 总共110秒，但每个小步为0.1秒
+  TotalSteps := 110 * 10; // 1100个小步
+
+  // 记录进度条开始
+  SaveStringToFile(LogFile, '【进度】开始模拟服务启动进度...' + #13#10, True);
+
+  for SmallSteps := 1 to TotalSteps do
+  begin
+    // 计算当前进度（1-110）
+    i := SmallSteps div 10;
+    if i < 1 then i := 1;
+    if i > 110 then i := 110;
+
+    // 更新进度条
+    WizardForm.ProgressGauge.Position := i;
+
+    // 更新状态文本，但不要每个小步都更新，而是每10个小步更新一次
+    if (SmallSteps mod 10) = 0 then
+    begin
+      WizardForm.StatusLabel.Caption := '正在启动Devtron服务，请耐心等待...' +
+                                      IntToStr((i * 100) div 110) + '%';
+
+      // 每10%记录一次日志
+      if (i mod 11) = 0 then
+        SaveStringToFile(LogFile, '【进度】服务启动进度: ' + IntToStr((i * 100) div 110) + '%' + #13#10, True);
+    end;
+
+    // 处理Windows消息以保持UI响应
+    Application.ProcessMessages;
+
+    // 短暂休眠，减少CPU使用但保持UI流畅
+    Sleep(100); // 每0.1秒更新一次，但总时间仍为110秒
+  end;
+
+  // 确保进度条显示100%
+  WizardForm.ProgressGauge.Position := 110;
+  WizardForm.StatusLabel.Caption := '正在完成Devtron服务启动...100%';
+  SaveStringToFile(LogFile, '【进度】服务启动进度: 100%' + #13#10, True);
+
+  // 完成服务启动，获取URL和密码
+  SaveStringToFile(LogFile, '【获取信息】正在获取Devtron URL和密码...' + #13#10, True);
+
+  TempBatchFile := ExpandConstant('{tmp}\get_devtron_url.bat');
+  SaveStringToFile(TempBatchFile,
+    '@echo off' + #13#10 +
+    'chcp 65001 > nul' + #13#10 +
+    'set KUBECONFIG=' + KubeconfigPath + #13#10 +
+    'echo [命令] kubectl describe serviceexporter devtron-itf -n devtroncd > "' + LogFile + '.command" 2>&1' + #13#10 +
+    '"' + ExpandConstant('{app}\kubectl.exe') + '" describe serviceexporter devtron-itf -n devtroncd > "' +
+    ExpandConstant('{app}\devtron_url.txt') + '" 2>&1' + #13#10,
+    False);
+
+  // 执行获取URL的命令
+  SaveStringToFile(LogFile, '【执行命令】获取Devtron URL...' + #13#10, True);
+  if Exec(ExpandConstant('{cmd}'), '/c "' + TempBatchFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and
+     FileExists(ExpandConstant('{app}\devtron_url.txt')) and
+     LoadStringFromFile(ExpandConstant('{app}\devtron_url.txt'), OutputContent) then
+  begin
+    DevtronUrl := ExtractDevtronUrl(OutputContent);
+    if DevtronUrl <> '' then
+      SaveStringToFile(LogFile, '【信息】成功获取Devtron URL: ' + DevtronUrl + #13#10, True)
+    else
+      SaveStringToFile(LogFile, '【警告】未能从输出中提取Devtron URL' + #13#10, True);
+  end
+  else
+  begin
+    SaveStringToFile(LogFile, '【错误】执行获取URL命令失败，错误代码: ' + IntToStr(ResultCode) + #13#10, True);
+  end;
+
+  if DevtronUrl = '' then
+  begin
+    SaveStringToFile(LogFile, '【警告】无法获取Devtron URL' + #13#10, True);
+    MsgBox('无法获取Devtron URL，请检查Devtron是否正常运行。', mbError, MB_OK);
+  end;
+
+  // 获取管理员密码
+  SaveStringToFile(LogFile, '【执行命令】获取Devtron管理员密码...' + #13#10, True);
+  DevtronPassword := GetDevtronAdminPassword();
+
+  // 如果无法获取密码，显示提示
+  if DevtronPassword = '' then
+  begin
+    SaveStringToFile(LogFile, '【警告】未能获取管理员密码' + #13#10, True);
+    MsgBox('Devtron安装已完成。安装完成后，您可以通过桌面快捷方式访问Devtron控制台。' + #13#10 +
+           '无法自动获取Devtron管理员密码。您可以通过以下命令手动获取:' + #13#10 +
+           'kubectl -n devtroncd get secret devtron-secret -o jsonpath=''{.data.ADMIN_PASSWORD}''  在进行 base64 解码',
+           mbInformation, MB_OK);
+  end
+  else
+  begin
+    SaveStringToFile(LogFile, '【信息】成功获取管理员密码' + #13#10, True);
+  end;
+
+  // 创建启动脚本
+  SaveStringToFile(LogFile, '【创建脚本】生成Devtron启动脚本...' + #13#10, True);
+  CreateDevtronLauncherScript();
+
+  // 计算总耗时
+  ElapsedSeconds := Round((Now - StartTime) * 24 * 60 * 60);
+  SaveStringToFile(LogFile, '【完成】服务启动流程已完成，总耗时: ' + IntToStr(ElapsedSeconds) + '秒' + #13#10, True);
+  SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+
+  // 完成提示
+  MsgBox('Devtron安装和服务启动已完成，您可以通过桌面快捷方式访问Devtron控制台。', mbInformation, MB_OK);
+
+  // 清理临时文件
+  DeleteFile(TempBatchFile);
+end;
+// 更新服务启动进度
+procedure UpdateServiceProgress(Sender: TObject);
+var
+  CurrentProgress: Integer;
+  TempBatchFile: string;
+  OutputContent: AnsiString;
+  KubeconfigPath: string;
+  ResultCode: Integer;
+begin
+  // 获取当前进度
+  CurrentProgress := TTimer(Sender).Tag;
+
+  // 更新进度条
+  WizardForm.ProgressGauge.Position := CurrentProgress;
+
+  // 更新状态文本
+  WizardForm.StatusLabel.Caption := '正在启动Devtron服务，请耐心等待...' +
+                                    IntToStr((CurrentProgress * 100) div 110) + '%';
+
+  // 增加进度
+  CurrentProgress := CurrentProgress + 1;
+  TTimer(Sender).Tag := CurrentProgress;
+
+  // 检查是否完成
+  if CurrentProgress > 110 then
+  begin
+    // 停止定时器
+    TTimer(Sender).Enabled := False;
+
+    // 完成服务启动，获取URL和密码
+    KubeconfigPath := ExpandConstant('{app}\kubeconfig');
+
+    // 获取Devtron URL
+    TempBatchFile := ExpandConstant('{tmp}\get_devtron_url.bat');
+    SaveStringToFile(TempBatchFile,
+      '@echo off' + #13#10 +
+      'chcp 65001 > nul' + #13#10 +
+      'set KUBECONFIG=' + KubeconfigPath + #13#10 +
+      '"' + ExpandConstant('{app}\kubectl.exe') + '" describe serviceexporter devtron-itf -n devtroncd > "' +
+      ExpandConstant('{app}\devtron_url.txt') + '" 2>&1' + #13#10,
+      False);
+
+    if Exec(ExpandConstant('{cmd}'), '/c "' + TempBatchFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and
+       FileExists(ExpandConstant('{app}\devtron_url.txt')) and
+       LoadStringFromFile(ExpandConstant('{app}\devtron_url.txt'), OutputContent) then
+    begin
+      DevtronUrl := ExtractDevtronUrl(OutputContent);
+    end;
+
+    if DevtronUrl = '' then
+      MsgBox('无法获取Devtron URL，请检查Devtron是否正常运行。', mbError, MB_OK);
+
+    // 获取管理员密码
+    DevtronPassword := GetDevtronAdminPassword();
+
+    // 如果无法获取密码，显示提示
+    if DevtronPassword = '' then
+    begin
+      MsgBox('Devtron安装已完成。安装完成后，您可以通过桌面快捷方式访问Devtron控制台。Devtron 管理员密码。' + #13#10 +
+            '您可以cmd窗口执行以下命令获取:' + #13#10 +
+            'kubectl -n devtroncd get secret devtron-secret -o jsonpath=''{.data.ADMIN_PASSWORD}''  在进行 base64 解码',
+            mbInformation, MB_OK);
+    end;
+
+    // 创建启动脚本
+    CreateDevtronLauncherScript();
+
+    MsgBox('Devtron安装已完成，您可以通过桌面快捷方式访问Devtron控制台。', mbInformation, MB_OK);
+
+    // 清理临时文件
+    DeleteFile(TempBatchFile);
+  end;
+end;
+
+// 处理安装完成后的操作
+procedure ProcessInstallComplete;
+var
+  KubeconfigPath: string;
+  LogFile: string;
+begin
+  // 记录日志文件路径
+  LogFile := ExpandConstant('{app}\devtron_service.log');
+
+  // 记录服务启动开始
+  SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+  SaveStringToFile(LogFile, '【服务启动】开始启动Devtron服务 - ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + #13#10, True);
+
+  // 告知用户服务启动开始
+  MsgBox('Devtron安装完成，正在启动服务，请稍候...', mbInformation, MB_OK);
+
+  KubeconfigPath := ExpandConstant('{app}\kubeconfig');
+
+  // 使用WizardForm进度条
+  WizardForm.StatusLabel.Caption := '正在启动Devtron服务，请耐心等待...';
+  WizardForm.ProgressGauge.Style := npbstNormal;
+  WizardForm.ProgressGauge.Min := 0;
+  WizardForm.ProgressGauge.Max := 110;
+
+  // 用简单方法代替计时器，确保UI更新
+  // 这样我们直接使用阻塞方式但保持UI响应
+  ProgressSimulationWithUIUpdate(LogFile);
+end;
+
+
+
+// 代替定时器实现的非阻塞安装
+function InstallDevtron: Boolean;
+var
+  LogFile, TempBatchFile, KubeconfigPath, CompleteFlagFile: string;
+  ResultCode: Integer;
+  StartDateTime, CurrentDateTime: TDateTime;
+  ElapsedSeconds: Integer;
+begin
+  Result := False;
+
+  try
+    // 初始化文件路径
+    LogFile := ExpandConstant('{app}\devtron_install.log');
+    KubeconfigPath := ExpandConstant('{app}\kubeconfig');
+    CompleteFlagFile := ExpandConstant('{app}\install_complete.flag');
+
+    // 确保标记文件不存在
+    DeleteFile(CompleteFlagFile);
+
+    // 记录安装开始 - 带时间戳
+    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+    SaveStringToFile(LogFile, '【开始安装】Devtron安装开始 - ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + #13#10, True);
+    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+
+    // 创建安装批处理文件
+    TempBatchFile := ExpandConstant('{app}\devtron_install.bat');
+
+    // 构建批处理文件内容 - 通过分段提高可读性
+    SaveStringToFile(TempBatchFile,
+      '@echo off' + #13#10 +
+      'setlocal enabledelayedexpansion' + #13#10 +
+      'chcp 65001 > nul' + #13#10 +
+      'cd /d "' + ExpandConstant('{app}\devtron') + '"' + #13#10 +
+      'set KUBECONFIG=' + KubeconfigPath + #13#10 + #13#10 +
+
+      'echo [步骤1] 正在获取集群信息...' + #13#10 +
+      'echo [步骤1] 正在获取集群信息... >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\kubectl.exe') + '" config view > config_view.txt 2>&1' + #13#10 + #13#10 +
+
+      'set "server_url="' + #13#10 +
+      'for /f "delims=" %%i in (''type config_view.txt ^| find "server:"'') do (' + #13#10 +
+      '    set "line=%%i"' + #13#10 +
+      '    for /f "tokens=1* delims= " %%a in ("!line!") do (' + #13#10 +
+      '        if /i "%%a"=="server:" (' + #13#10 +
+      '            set "server_url=%%b"' + #13#10 +
+      '            goto :server_found' + #13#10 +
+      '        )' + #13#10 +
+      '    )' + #13#10 +
+      ')' + #13#10 + #13#10 +
+
+      ':server_found' + #13#10 +
+      'if "!server_url!"=="" (' + #13#10 +
+      '    echo [错误] 在kubeconfig中未找到server字段！ >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      '    exit /b 1' + #13#10 +
+      ')' + #13#10 + #13#10 +
+
+      'echo [步骤2] 开始安装Devtron...' + #13#10 +
+      'echo [步骤2] 开始安装Devtron... >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
+
+      'echo [步骤2.1] 清理现有安装（如果存在）... >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\kubectl.exe') + '" delete namespace devtroncd >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\helm.exe') + '" uninstall devtron --namespace devtroncd >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
+
+      'echo [步骤2.2] 解析服务器参数... >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      'for /f "tokens=2 delims=." %%a in ("!server_url!") do set "zoneID=%%a"' + #13#10 +
+      'for /f "tokens=4 delims=/" %%a in ("!server_url!") do set "vksID=%%a"' + #13#10 + #13#10 +
+
+      'echo [信息] zoneID: !zoneID! >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      'echo [信息] vksID: !vksID! >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
+
+      'echo [步骤2.3] 执行Helm安装... >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --set zoneID=!zoneID! --set vksID=!vksID! --set global.containerRegistry="registry.!zoneID!.alayanew.com:8443/vc-app_market/devtron" --timeout 300s >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
+
+      'echo [步骤2.4] 创建ConfigMap... >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\kubectl.exe') + '" create configmap devtron-global-config -n devtroncd --from-literal=vksID=!vksID! >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
+
+      'echo [完成] Devtron安装已完成 >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      'echo Installation complete > "' + CompleteFlagFile + '"' + #13#10,
+      False);
+
+    // 在执行安装命令之前添加进度条准备
+    WizardForm.ProgressGauge.Style := npbstMarquee; // 使用动态进度条样式
+    WizardForm.StatusLabel.Caption := '正在安装Devtron，需要2-3分钟，请耐心等待...';
+
+    SaveStringToFile(LogFile, '【安装开始】执行安装命令...' + #13#10, True);
+
+    // 启动批处理但不等待完成
+    if not ShellExec('', ExpandConstant('{cmd}'), '/c "' + TempBatchFile + '"', '', SW_HIDE, ewNoWait, ResultCode) then
+    begin
+      Log('启动Devtron安装失败');
+      SaveStringToFile(LogFile, '【错误】无法启动安装程序，错误代码: ' + IntToStr(ResultCode) + #13#10, True);
+      MsgBox('无法启动Devtron安装程序。错误代码: ' + IntToStr(ResultCode), mbError, MB_OK);
+      WizardForm.ProgressGauge.Style := npbstNormal;
+      WizardForm.ProgressGauge.Position := 0;
+      Exit;
+    end;
+
+    // 记录开始时间
+    StartDateTime := Now;
+
+    // 循环等待安装完成，同时保持UI响应
+    SaveStringToFile(LogFile, '【状态】等待安装过程完成...' + #13#10, True);
+
+    while not FileExists(CompleteFlagFile) do
+    begin
+      // 处理消息让UI更流畅
+      Application.ProcessMessages;
+
+      // 计算已经过的时间（以秒为单位）
+      CurrentDateTime := Now;
+      ElapsedSeconds := Round((CurrentDateTime - StartDateTime) * 24 * 60 * 60);
+
+      // 更新状态文本
+      WizardForm.StatusLabel.Caption := '正在安装Devtron，请耐心等待...（已运行' + IntToStr(ElapsedSeconds) + '秒）';
+
+      // 每30秒记录一次等待状态
+      if (ElapsedSeconds mod 30 = 0) and (ElapsedSeconds > 0) then
+        SaveStringToFile(LogFile, '【状态】安装进行中...已等待' + IntToStr(ElapsedSeconds) + '秒' + #13#10, True);
+
+      // 短暂休眠，减少CPU使用
+      Sleep(50);
+    end;
+
+    // 安装完成
+    DeleteFile(CompleteFlagFile);
+    WizardForm.ProgressGauge.Style := npbstNormal;
+    WizardForm.ProgressGauge.Position := 100;
+    WizardForm.StatusLabel.Caption := 'Devtron安装完成';
+
+    // 记录安装完成
+    SaveStringToFile(LogFile, '【安装完成】Devtron安装已完成，用时' + IntToStr(ElapsedSeconds) + '秒' + #13#10, True);
+    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+
+    // 继续处理
+    ProcessInstallComplete();
+
+    Result := True;
+  except
+    //on E: Exception do
+    begin
+      // 详细记录错误信息
+      Log('安装Devtron时发生错误: ' );
+      SaveStringToFile(LogFile, '【错误】安装过程中出现异常: '  + #13#10, True);
+      SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+      MsgBox('安装Devtron时发生错误: '  + #13#10 + '请检查日志了解详情。', mbError, MB_OK);
+    end;
+  end;
+end;
+
+//------------------------------------------------------------------------------
+// 安装事件处理
+//------------------------------------------------------------------------------
+
+// 安装后处理
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  KubeconfigPath, DecodedFile, ToolsPath: string;
+  DecodingSuccess: Boolean;
+  LogFile: string;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    // 初始化日志文件
+    LogFile := ExpandConstant('{app}\setup_post_install.log');
+    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+    SaveStringToFile(LogFile, '【开始】安装后处理流程 - ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + #13#10, True);
+    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+
+    // 设置环境变量
+    ToolsPath := ExpandConstant('{app}');
+    SaveStringToFile(LogFile, '【步骤1】添加应用程序目录到系统PATH: ' + ToolsPath + #13#10, True);
+    AddToSystemPathEnvironmentVariable(ToolsPath);
+    SaveStringToFile(LogFile, '【步骤1】PATH环境变量已更新' + #13#10, True);
+
+    // 处理kubeconfig文件
+    SaveStringToFile(LogFile, '【步骤2】开始处理kubeconfig文件' + #13#10, True);
+    KubeconfigPath := KubeconfigPage.Values[0];
+    SaveStringToFile(LogFile, '【步骤2.1】源kubeconfig路径: ' + KubeconfigPath + #13#10, True);
+    DecodedFile := ExpandConstant('{app}\kubeconfig');
+    SaveStringToFile(LogFile, '【步骤2.2】目标kubeconfig路径: ' + DecodedFile + #13#10, True);
+
+    // 解码kubeconfig
+    SaveStringToFile(LogFile, '【步骤3】解码kubeconfig文件' + #13#10, True);
+    DecodingSuccess := Base64DecodeFile(KubeconfigPath, DecodedFile);
+
+    if DecodingSuccess then
+    begin
+      SaveStringToFile(LogFile, '【步骤3】kubeconfig解码成功' + #13#10, True);
+
+      // 设置环境变量
+      SaveStringToFile(LogFile, '【步骤4】设置KUBECONFIG环境变量: ' + DecodedFile + #13#10, True);
+      SetSystemEnvironmentVariable('KUBECONFIG', DecodedFile);
+      SaveStringToFile(LogFile, '【步骤4】KUBECONFIG环境变量已设置' + #13#10, True);
+
+      // 确保配置生效
+      SaveStringToFile(LogFile, '【步骤5】测试KUBECONFIG配置是否生效' + #13#10, True);
+      if not EnsureKubeconfigWorks(DecodedFile) then
+      begin
+        SaveStringToFile(LogFile, '【警告】KUBECONFIG测试未通过，可能需要重启计算机' + #13#10, True);
+        MsgBox('KUBECONFIG环境变量已设置，但可能需要重启计算机才能完全生效。安装将继续进行。', mbInformation, MB_OK);
+      end
+      else
+      begin
+        SaveStringToFile(LogFile, '【步骤5】KUBECONFIG测试通过' + #13#10, True);
+      end;
+
+      // 安装Devtron
+      SaveStringToFile(LogFile, '【步骤6】开始安装Devtron' + #13#10, True);
+      SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+
+      try
+        if InstallDevtron() then
+          SaveStringToFile(LogFile, '【成功】Devtron安装流程完成' + #13#10, True)
+        else
+          SaveStringToFile(LogFile, '【错误】Devtron安装流程执行失败' + #13#10, True);
+      except
+        begin
+          SaveStringToFile(LogFile, '【异常】Devtron安装时出现异常: '  + #13#10, True);
+          Log('安装Devtron时发生异常: ' );
+          MsgBox('安装Devtron时发生错误: '  + #13#10 + '请查看日志了解详情。', mbError, MB_OK);
+        end;
+      end;
+    end
+    else
+    begin
+      SaveStringToFile(LogFile, '【错误】KUBECONFIG解码失败，终止安装' + #13#10, True);
+      SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+      MsgBox('KUBECONFIG解码失败，无法继续安装。请确认提供的文件是有效的kubeconfig文件，并重新运行安装程序。', mbError, MB_OK);
+      Abort();
+    end;
+
+    SaveStringToFile(LogFile, '【完成】安装后处理流程结束 - ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + #13#10, True);
+    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+  end;
+end;
