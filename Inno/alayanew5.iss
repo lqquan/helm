@@ -36,7 +36,10 @@ WizardImageFile=D:/exe/大.bmp
 SetupIconFile=D:/exe/favicon.ico
 VersionInfoVersion={#MyAppVersion}
 DefaultDialogFontName=Microsoft YaHei
+UninstallDisplayIcon={app}\app_icon.ico
 
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}"
 ;------------------------------------------------------------------------------
 ; 语言设置
 ;------------------------------------------------------------------------------
@@ -155,7 +158,7 @@ begin
     Log('解码失败，返回码: ' + IntToStr(ResultCode));
     SaveStringToFile(LogFile, '【错误】解码失败，返回码: ' + IntToStr(ResultCode) + #13#10, True);
     SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
-    MsgBox('文件解码失败，可能不是有效的Base64格式。请确认提供的是正确的kubeconfig文件。', mbError, MB_OK);
+    //MsgBox('文件解码失败，可能不是有效的Base64格式。请确认提供的是正确的kubeconfig文件。', mbError, MB_OK);
     Exit;
   end;
 
@@ -804,7 +807,7 @@ begin
   SaveStringToFile(LogFile, '【服务启动】开始启动Devtron服务 - ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + #13#10, True);
 
   // 告知用户服务启动开始
-  MsgBox('Devtron安装完成，正在启动服务，请稍候...', mbInformation, MB_OK);
+  //MsgBox('Devtron安装完成，正在启动服务，请稍候...', mbInformation, MB_OK);
 
   KubeconfigPath := ExpandConstant('{app}\kubeconfig');
 
@@ -903,7 +906,7 @@ begin
 
     // 在执行安装命令之前添加进度条准备
     WizardForm.ProgressGauge.Style := npbstMarquee; // 使用动态进度条样式
-    WizardForm.StatusLabel.Caption := '正在安装Devtron，需要2-3分钟，请耐心等待...';
+    WizardForm.StatusLabel.Caption := '正在安装Devtron，需要3-5分钟，请耐心等待...';
 
     SaveStringToFile(LogFile, '【安装开始】执行安装命令...' + #13#10, True);
 
@@ -911,8 +914,8 @@ begin
     if not ShellExec('', ExpandConstant('{cmd}'), '/c "' + TempBatchFile + '"', '', SW_HIDE, ewNoWait, ResultCode) then
     begin
       Log('启动Devtron安装失败');
-      SaveStringToFile(LogFile, '【错误】无法启动安装程序，错误代码: ' + IntToStr(ResultCode) + #13#10, True);
-      MsgBox('无法启动Devtron安装程序。错误代码: ' + IntToStr(ResultCode), mbError, MB_OK);
+      SaveStringToFile(LogFile, '【错误】无法启动安装程序，错误代码: ' + IntToStr(ResultCode) + '，错误类型: mbError' + #13#10, True);
+      //MsgBox('无法启动Devtron安装程序。错误代码: ' + IntToStr(ResultCode), mbError, MB_OK);
       WizardForm.ProgressGauge.Style := npbstNormal;
       WizardForm.ProgressGauge.Position := 0;
       Exit;
@@ -934,7 +937,7 @@ begin
       ElapsedSeconds := Round((CurrentDateTime - StartDateTime) * 24 * 60 * 60);
 
       // 更新状态文本
-      WizardForm.StatusLabel.Caption := '正在安装Devtron，请耐心等待...（已运行' + IntToStr(ElapsedSeconds) + '秒）';
+      WizardForm.StatusLabel.Caption := '正在安装Devtron，需要3-5分钟，请耐心等待...（已运行' + IntToStr(ElapsedSeconds) + '秒）';
 
       // 每30秒记录一次等待状态
       if (ElapsedSeconds mod 30 = 0) and (ElapsedSeconds > 0) then
@@ -965,7 +968,7 @@ begin
       Log('安装Devtron时发生错误: ' );
       SaveStringToFile(LogFile, '【错误】安装过程中出现异常: '  + #13#10, True);
       SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
-      MsgBox('安装Devtron时发生错误: '  + #13#10 + '请检查日志了解详情。', mbError, MB_OK);
+      //MsgBox('安装Devtron时发生错误: '  + #13#10 + '请检查日志了解详情。', mbError, MB_OK);
     end;
   end;
 end;
@@ -1049,7 +1052,7 @@ begin
       SaveStringToFile(LogFile, '【错误】KUBECONFIG解码失败，终止安装' + #13#10, True);
       SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
       MsgBox('KUBECONFIG解码失败，无法继续安装。请确认提供的文件是有效的kubeconfig文件，并重新运行安装程序。', mbError, MB_OK);
-      Abort();
+      Exit;
     end;
 
     SaveStringToFile(LogFile, '【完成】安装后处理流程结束 - ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + #13#10, True);
