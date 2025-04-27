@@ -4,7 +4,7 @@
 ; 基本信息设置
 ;------------------------------------------------------------------------------
 #define MyAppName "AlayaNeWTools"
-#define MyAppVersion "1.0.7"
+#define MyAppVersion "1.0.8"
 #define MyAppPublisher "北京九章云极科技有限公司"
 #define MyAppURL "https://www.alayanew.com"
 #define MyAppExeName "AlayaNeWTools.exe"
@@ -143,9 +143,10 @@ begin
   if LoadStringFromFile(InputFile, FileContent) then
   begin
     FileContent := Trim(FileContent);
-    IsJsonOrYaml := (Pos('{', FileContent) = 1) or
-                   (Pos('apiVersion', FileContent) > 0) or
-                   (Pos('kind: Config', FileContent) > 0);
+    Log('执行FileContent解码: ' + FileContent);
+    IsJsonOrYaml := (Pos('{', FileContent) = 1) and
+                   (Pos('apiVersion', FileContent) > 0) and
+                   (Pos('kind', FileContent) > 0);
 
     if IsJsonOrYaml then
     begin
@@ -692,7 +693,7 @@ begin
   SaveStringToFile(LogFile, '【进度】开始模拟服务启动进度...' + #13#10, True);
 
   // 设置总启动时间为110秒
-  StartupSeconds := 100;
+  StartupSeconds := 110;
 
   // 使用非阻塞方式启动计时器进程
   TempBatchFile := ExpandConstant('{app}\progress_timer.bat');
@@ -936,6 +937,7 @@ var
   ResultCode: Integer;
   StartDateTime, CurrentDateTime: TDateTime;
   ElapsedSeconds: Integer;
+  MaxWaitTime: Integer;
 begin
   Result := False;
 
@@ -1028,6 +1030,8 @@ begin
 
     // 记录开始时间
     StartDateTime := Now;
+    // 最大等待时间，单位为秒（例如，等待10分钟）
+    MaxWaitTime := 5 * 60;  // 10分钟
 
     // 循环等待安装完成，同时保持UI响应
     SaveStringToFile(LogFile, '【状态】等待安装过程完成...' + #13#10, True);
@@ -1047,6 +1051,14 @@ begin
       // 每30秒记录一次等待状态
       if (ElapsedSeconds mod 30 = 0) and (ElapsedSeconds > 0) then
         SaveStringToFile(LogFile, '【状态】安装进行中...已等待' + IntToStr(ElapsedSeconds) + '秒' + #13#10, True);
+
+      // 如果已经等待超过最大等待时间，则跳出循环
+      if ElapsedSeconds >= MaxWaitTime then
+      begin
+        SaveStringToFile(LogFile, '【错误】安装超时，退出安装...' + #13#10, True);
+        MsgBox('安装超时，程序将退出。', mbError, MB_OK);
+        Exit;  // 退出安装
+      end;
 
       // 短暂休眠，减少CPU使用
       Sleep(50);
