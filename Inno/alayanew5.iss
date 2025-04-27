@@ -113,6 +113,8 @@ var
   ResultCode: Integer;
   TempOutputFile: string;
   LogFile: string;
+  FileContent: AnsiString;
+  IsJsonOrYaml: Boolean;
 begin
   Result := False;
   LogFile := ExpandConstant('{app}\base64_decode.log');
@@ -137,6 +139,45 @@ begin
     Exit;
   end;
 
+  // 读取文件内容，检查是否已经是JSON/YAML格式
+  if LoadStringFromFile(InputFile, FileContent) then
+  begin
+    FileContent := Trim(FileContent);
+    IsJsonOrYaml := (Pos('{', FileContent) = 1) or
+                   (Pos('apiVersion', FileContent) > 0) or
+                   (Pos('kind: Config', FileContent) > 0);
+
+    if IsJsonOrYaml then
+    begin
+      // 文件已经是JSON/YAML格式，记录日志
+      SaveStringToFile(LogFile, '【检测】文件内容已经是JSON/YAML格式，无需解码' + #13#10, True);
+      SaveStringToFile(LogFile, '【步骤】直接复制文件到目标位置' + #13#10, True);
+
+      if FileExists(OutputFile) then
+        DeleteFile(OutputFile); // 先删掉旧文件（避免 FileCopy 报错）
+        SaveStringToFile(LogFile, '【步骤】先删掉旧文件（避免 FileCopy 报错）' + #13#10, True);
+
+      // 直接复制文件到目标位置
+      if FileCopy(InputFile, OutputFile, True) then
+      begin
+        Result := True;
+        Log('文件已是JSON/YAML格式，已直接复制: ' + OutputFile);
+        SaveStringToFile(LogFile, '【成功】文件已直接复制到目标位置' + #13#10, True);
+        SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+        Exit;
+      end else begin
+        Log('无法复制文件到目标位置');
+        SaveStringToFile(LogFile, '【错误】无法复制文件到目标位置: ' + OutputFile + #13#10, True);
+        SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+        //MsgBox('无法将文件复制到目标位置。请检查目标路径是否可写或有足够权限。', mbError, MB_OK);
+        Exit;
+      end;
+    end;
+
+    // 不是JSON/YAML格式，继续解码流程
+    SaveStringToFile(LogFile, '【检测】文件未识别为JSON/YAML格式，继续解码流程' + #13#10, True);
+  end;
+
   // 执行certutil命令进行解码
   SaveStringToFile(LogFile, '【步骤1】执行certutil命令进行Base64解码' + #13#10, True);
   SaveStringToFile(LogFile, '【命令】certutil -decode "' + InputFile + '" "' + TempOutputFile + '"' + #13#10, True);
@@ -147,7 +188,7 @@ begin
     Log('certutil命令执行失败，错误码: ' + IntToStr(ResultCode));
     SaveStringToFile(LogFile, '【错误】certutil命令执行失败，错误码: ' + IntToStr(ResultCode) + #13#10, True);
     SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
-    MsgBox('无法执行certutil命令，请确认是否安装了工具。若未安装，请先安装工具后再试。', mbError, MB_OK);
+    MsgBox('无法执行certutil命令，请确认是否安装了证书工具。若未安装，请先安装证书工具后再试。', mbError, MB_OK);
     Exit;
   end;
 
@@ -886,54 +927,6 @@ begin
   ProgressSimulationWithUIUpdate(LogFile);
 end;
 
-// 检测文件是否为YAML/JSON格式（已解码的kubeconfig）
-function IsYamlOrJsonFile(const FilePath: string): Boolean;
-var
-  FileContent: AnsiString;
-  TrimmedContent: string;
-  LogFile: string;
-begin
-  Result := False;
-  LogFile := ExpandConstant('{app}\format_detect.log');
-
-  // 尝试读取文件内容
-  if not LoadStringFromFile(FilePath, FileContent) then
-  begin
-    SaveStringToFile(LogFile, '【错误】无法读取文件内容: ' + FilePath + #13#10, True);
-    Exit;
-  end;
-
-  // 如果文件太大，只检查开头部分
-  if Length(FileContent) > 1000 then
-    FileContent := Copy(FileContent, 1, 1000);
-
-  // 移除空白
-  TrimmedContent := Trim(FileContent);
-
-  // 记录文件开始部分
-  SaveStringToFile(LogFile, '【检测】文件开始内容: ' + Copy(TrimmedContent, 1, 100) + '...' + #13#10, True);
-
-  // 检查JSON格式特征
-  if (Copy(TrimmedContent, 1, 1) = '{') and (Pos('"apiVersion":', TrimmedContent) > 0) then
-  begin
-    SaveStringToFile(LogFile, '【检测】文件疑似JSON格式Kubeconfig' + #13#10, True);
-    Result := True;
-    Exit;
-  end;
-
-  // 检查YAML格式特征
-  if (Pos('apiVersion:', TrimmedContent) > 0) and
-     (Pos('clusters:', TrimmedContent) > 0) and
-     (Pos('contexts:', TrimmedContent) > 0) then
-  begin
-    SaveStringToFile(LogFile, '【检测】文件疑似YAML格式Kubeconfig' + #13#10, True);
-    Result := True;
-    Exit;
-  end;
-
-  SaveStringToFile(LogFile, '【检测】文件不是已解码的kubeconfig格式' + #13#10, True);
-end;
-
 
 
 // 代替定时器实现的非阻塞安装
@@ -1095,7 +1088,6 @@ var
   KubeconfigPath, DecodedFile, ToolsPath: string;
   DecodingSuccess: Boolean;
   LogFile: string;
-  IsAlreadyDecoded: Boolean;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -1118,31 +1110,9 @@ begin
     DecodedFile := ExpandConstant('{app}\kubeconfig');
     SaveStringToFile(LogFile, '【步骤2.2】目标kubeconfig路径: ' + DecodedFile + #13#10, True);
 
-    // 检查是否已经是解码后的格式
-    SaveStringToFile(LogFile, '【步骤2.3】检测文件是否已解码' + #13#10, True);
-    IsAlreadyDecoded := IsYamlOrJsonFile(KubeconfigPath);
-
-    if IsAlreadyDecoded then
-    begin
-      // 如果已经是解码格式，直接复制
-      SaveStringToFile(LogFile, '【步骤2.4】文件已是解码格式，直接复制' + #13#10, True);
-      if FileCopy(KubeconfigPath, DecodedFile, False) then
-      begin
-        SaveStringToFile(LogFile, '【步骤2.5】文件复制成功' + #13#10, True);
-        DecodingSuccess := True;
-      end
-      else
-      begin
-        SaveStringToFile(LogFile, '【错误】无法复制文件' + #13#10, True);
-        DecodingSuccess := False;
-      end;
-    end
-    else
-    begin
-      // 否则尝试解码
-      SaveStringToFile(LogFile, '【步骤2.4】文件需要解码' + #13#10, True);
-      DecodingSuccess := Base64DecodeFile(KubeconfigPath, DecodedFile);
-    end;
+    // 解码kubeconfig
+    SaveStringToFile(LogFile, '【步骤3】解码kubeconfig文件' + #13#10, True);
+    DecodingSuccess := Base64DecodeFile(KubeconfigPath, DecodedFile);
 
     if DecodingSuccess then
     begin
