@@ -105,14 +105,91 @@ end;
 
 // 验证用户是否选择了文件
 function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  KubeconfigPath: string;
+  TempOutputFile: string;
+  ResultCode: Integer;
+  LogFile: string;
+  FileContent: AnsiString;
+  IsValid: Boolean;
 begin
   Result := True;
+
   if CurPageID = KubeconfigPage.ID then
   begin
+    // 首先检查是否选择了文件
     if (KubeconfigPage.Values[0] = '') or (not FileExists(KubeconfigPage.Values[0])) then
     begin
       MsgBox('请选择有效的Kubeconfig文件。此步骤是必需的，无法继续安装。', mbError, MB_OK);
       Result := False;
+      Exit;
+    end;
+
+    // 获取文件路径
+    KubeconfigPath := KubeconfigPage.Values[0];
+    LogFile := ExpandConstant('{tmp}\kubeconfig_verify.log');
+    TempOutputFile := ExpandConstant('{tmp}\kubeconfig_temp');
+
+    // 验证文件内容
+    IsValid := False;
+
+    // 尝试读取文件内容
+    if LoadStringFromFile(KubeconfigPath, FileContent) then
+    begin
+      FileContent := Trim(FileContent);
+
+      // 检查是否是JSON/YAML格式
+      if ((Pos('{', FileContent) = 1) and (Pos('apiVersion', FileContent) > 0) and (Pos('kind', FileContent) > 0))  then
+      begin
+        // 看起来是合法的JSON/YAML格式
+        IsValid := True;
+      end
+      else
+      begin
+        // 如果不是明显的JSON/YAML，尝试作为Base64解码
+        WizardForm.StatusLabel.Caption := '正在验证Kubeconfig文件...';
+
+        // 创建临时批处理来解码
+        SaveStringToFile(ExpandConstant('{tmp}\verify_kubeconfig.bat'),
+          '@echo off' + #13#10 +
+          'chcp 65001 > nul' + #13#10 +
+          'certutil -decode "' + KubeconfigPath + '" "' + TempOutputFile + '" > nul 2>&1' + #13#10,
+          False);
+
+        // 执行批处理
+        if Exec(ExpandConstant('{cmd}'), '/c "' + ExpandConstant('{tmp}\verify_kubeconfig.bat') + '"',
+                '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+        begin
+          // 检查解码结果
+          if (ResultCode = 0) and FileExists(TempOutputFile) then
+          begin
+            // 读取解码后文件内容
+            if LoadStringFromFile(TempOutputFile, FileContent) then
+            begin
+              FileContent := Trim(FileContent);
+              // 再次检查是否是JSON/YAML格式
+              if ((Pos('{', FileContent) = 1) and (Pos('apiVersion', FileContent) > 0) and (Pos('kind', FileContent) > 0))  then
+              begin
+                IsValid := True;
+              end;
+            end;
+          end;
+        end;
+
+        // 清理临时文件
+        DeleteFile(TempOutputFile);
+        DeleteFile(ExpandConstant('{tmp}\verify_kubeconfig.bat'));
+      end;
+    end;
+
+    WizardForm.StatusLabel.Caption := '';
+
+    if not IsValid then
+    begin
+      // 文件验证失败
+      MsgBox('所选文件不是有效的Kubeconfig文件。请选择正确的文件后再继续。', mbError, MB_OK);
+      Result := False;
+      Exit;
     end;
   end
   else if CurPageID = DevtronPage.ID then
@@ -147,40 +224,28 @@ begin
   SaveStringToFile(LogFile, '【开始】Base64解码文件 - ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + #13#10, True);
   SaveStringToFile(LogFile, '【参数】输入文件: ' + InputFile + #13#10, True);
   SaveStringToFile(LogFile, '【参数】输出文件: ' + OutputFile + #13#10, True);
-  SaveStringToFile(LogFile, '【参数】临时文件: ' + TempOutputFile + #13#10, True);
 
   Log('执行Base64解码: ' + InputFile);
-
-  // 检查输入文件是否存在
-  if not FileExists(InputFile) then
-  begin
-    Log('输入文件不存在: ' + InputFile);
-    SaveStringToFile(LogFile, '【错误】输入文件不存在: ' + InputFile + #13#10, True);
-    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
-    MsgBox('Base64解码失败：输入文件不存在。', mbError, MB_OK);
-    Exit;
-  end;
 
   // 读取文件内容，检查是否已经是JSON/YAML格式
   if LoadStringFromFile(InputFile, FileContent) then
   begin
     FileContent := Trim(FileContent);
-    Log('执行FileContent解码: ' + FileContent);
     IsJsonOrYaml := (Pos('{', FileContent) = 1) and
                    (Pos('apiVersion', FileContent) > 0) and
                    (Pos('kind', FileContent) > 0);
 
     if IsJsonOrYaml then
     begin
-      // 文件已经是JSON/YAML格式，记录日志
+      // 文件已经是JSON/YAML格式，直接复制
       SaveStringToFile(LogFile, '【检测】文件内容已经是JSON/YAML格式，无需解码' + #13#10, True);
-      SaveStringToFile(LogFile, '【步骤】直接复制文件到目标位置' + #13#10, True);
-
+      // 先检查并删除目标文件（如果存在）
       if FileExists(OutputFile) then
-        DeleteFile(OutputFile); // 先删掉旧文件（避免 FileCopy 报错）
-        SaveStringToFile(LogFile, '【步骤】先删掉旧文件（避免 FileCopy 报错）' + #13#10, True);
-
-      // 直接复制文件到目标位置
+      begin
+        SaveStringToFile(LogFile, '【步骤】删除已存在的目标文件: ' + OutputFile + #13#10, True);
+        if not DeleteFile(OutputFile) then
+          SaveStringToFile(LogFile, '【警告】无法删除已存在的目标文件，将尝试覆盖' + #13#10, True);
+      end;
       if FileCopy(InputFile, OutputFile, True) then
       begin
         Result := True;
@@ -192,80 +257,54 @@ begin
         Log('无法复制文件到目标位置');
         SaveStringToFile(LogFile, '【错误】无法复制文件到目标位置: ' + OutputFile + #13#10, True);
         SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
-        //MsgBox('无法将文件复制到目标位置。请检查目标路径是否可写或有足够权限。', mbError, MB_OK);
         Exit;
       end;
     end;
 
-    // 不是JSON/YAML格式，继续解码流程
-    SaveStringToFile(LogFile, '【检测】文件未识别为JSON/YAML格式，继续解码流程' + #13#10, True);
+    // 不是JSON/YAML格式，执行解码
+    SaveStringToFile(LogFile, '【检测】文件可能是Base64编码，尝试解码' + #13#10, True);
   end;
 
   // 执行certutil命令进行解码
-  SaveStringToFile(LogFile, '【步骤1】执行certutil命令进行Base64解码' + #13#10, True);
-  SaveStringToFile(LogFile, '【命令】certutil -decode "' + InputFile + '" "' + TempOutputFile + '"' + #13#10, True);
+  SaveStringToFile(LogFile, '【执行】certutil解码命令' + #13#10, True);
 
   if not Exec('certutil.exe', '-decode "' + InputFile + '" "' + TempOutputFile + '"',
               '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
   begin
-    Log('certutil命令执行失败，错误码: ' + IntToStr(ResultCode));
-    SaveStringToFile(LogFile, '【错误】certutil命令执行失败，错误码: ' + IntToStr(ResultCode) + #13#10, True);
-    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
-    MsgBox('无法执行certutil命令，请确认是否安装了证书工具。若未安装，请先安装证书工具后再试。', mbError, MB_OK);
+    Log('certutil命令执行失败');
+    SaveStringToFile(LogFile, '【错误】certutil命令执行失败' + #13#10, True);
     Exit;
   end;
 
-  // 检查命令执行结果
-  SaveStringToFile(LogFile, '【结果】certutil命令执行完成，返回码: ' + IntToStr(ResultCode) + #13#10, True);
-  if ResultCode <> 0 then
-  begin
-    Log('解码失败，返回码: ' + IntToStr(ResultCode));
-    SaveStringToFile(LogFile, '【错误】解码失败，返回码: ' + IntToStr(ResultCode) + #13#10, True);
-    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
-    //MsgBox('文件解码失败，可能不是有效的Base64格式。请确认提供的是正确的kubeconfig文件。', mbError, MB_OK);
-    Exit;
-  end;
-
-  // 验证解码结果
-  SaveStringToFile(LogFile, '【步骤2】验证解码后的文件是否存在' + #13#10, True);
+  // 检查解码结果
   if not FileExists(TempOutputFile) then
   begin
     Log('解码后文件不存在');
-    SaveStringToFile(LogFile, '【错误】解码后文件不存在: ' + TempOutputFile + #13#10, True);
-    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
-    MsgBox('解码后的文件未创建。请检查您是否有足够的磁盘空间和写入权限。', mbError, MB_OK);
+    SaveStringToFile(LogFile, '【错误】解码后文件不存在' + #13#10, True);
     Exit;
   end;
 
+  if FileExists(OutputFile) then
+      begin
+        SaveStringToFile(LogFile, '【步骤1】删除已存在的目标文件: ' + OutputFile + #13#10, True);
+        if not DeleteFile(OutputFile) then
+          SaveStringToFile(LogFile, '【警告1】无法删除已存在的目标文件，将尝试覆盖' + #13#10, True);
+      end;
   // 复制解码后的文件到目标位置
-  SaveStringToFile(LogFile, '【步骤3】将解码后的文件复制到目标位置' + #13#10, True);
-  if not FileCopy(TempOutputFile, OutputFile, False) then
+  if not FileCopy(TempOutputFile, OutputFile, True) then
   begin
     Log('无法复制文件到目标位置');
-    SaveStringToFile(LogFile, '【错误】无法复制文件到目标位置: ' + OutputFile + #13#10, True);
-    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
-    MsgBox('无法将解码后的文件复制到目标位置。请检查目标路径是否可写或有足够权限。', mbError, MB_OK);
+    SaveStringToFile(LogFile, '【错误】无法复制文件到目标位置' + #13#10, True);
     Exit;
   end;
 
   // 清理临时文件
-  SaveStringToFile(LogFile, '【步骤4】清理临时文件' + #13#10, True);
-  if not DeleteFile(TempOutputFile) then
-    SaveStringToFile(LogFile, '【警告】无法删除临时文件: ' + TempOutputFile + #13#10, True);
-
-  // 验证目标文件是否有效
-  SaveStringToFile(LogFile, '【步骤5】检查最终生成的文件' + #13#10, True);
-  if not FileExists(OutputFile) then
-  begin
-    SaveStringToFile(LogFile, '【错误】最终文件不存在: ' + OutputFile + #13#10, True);
-    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
-    Exit;
-  end;
+  DeleteFile(TempOutputFile);
 
   // 解码成功
   Result := True;
   Log('文件解码成功: ' + OutputFile);
-  SaveStringToFile(LogFile, '【成功】文件Base64解码完成' + #13#10, True);
+  SaveStringToFile(LogFile, '【成功】文件解码完成' + #13#10, True);
   SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
 end;
 
@@ -502,7 +541,7 @@ begin
     '  )' + #13#10 +
     ')' + #13#10 +
     'echo [Complete] Command execution finished >> "' + LogFileAdmin + '.output"' + #13#10,
-  False);
+    False);
 
   // 执行批处理
   SaveStringToFile(LogFileAdmin, '【步骤2】执行批处理文件' + #13#10, True);
@@ -985,7 +1024,6 @@ begin
     TempBatchFile := ExpandConstant('{app}\devtron_install.bat');
 
     // 构建批处理文件内容 - 通过分段提高可读性
-    // 构建批处理文件内容 - 通过分段提高可读性
     SaveStringToFile(TempBatchFile,
       '@echo off' + #13#10 +
       'setlocal enabledelayedexpansion' + #13#10 +
@@ -1149,13 +1187,13 @@ begin
     DecodedFile := ExpandConstant('{app}\kubeconfig');
     SaveStringToFile(LogFile, '【步骤2.2】目标kubeconfig路径: ' + DecodedFile + #13#10, True);
 
-    // 解码kubeconfig
-    SaveStringToFile(LogFile, '【步骤3】解码kubeconfig文件' + #13#10, True);
+    // 解码或复制kubeconfig文件
+    SaveStringToFile(LogFile, '【步骤3】处理kubeconfig文件' + #13#10, True);
     DecodingSuccess := Base64DecodeFile(KubeconfigPath, DecodedFile);
 
     if DecodingSuccess then
     begin
-      SaveStringToFile(LogFile, '【步骤3】kubeconfig解码成功' + #13#10, True);
+      SaveStringToFile(LogFile, '【步骤3】kubeconfig文件处理成功' + #13#10, True);
 
       // 设置环境变量
       SaveStringToFile(LogFile, '【步骤4】设置KUBECONFIG环境变量: ' + DecodedFile + #13#10, True);
@@ -1191,9 +1229,9 @@ begin
     end
     else
     begin
-      SaveStringToFile(LogFile, '【错误】KUBECONFIG解码失败，终止安装' + #13#10, True);
+      SaveStringToFile(LogFile, '【错误】kubeconfig文件处理失败' + #13#10, True);
       SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
-      MsgBox('KUBECONFIG解码失败，无法继续安装。请确认提供的文件是有效的kubeconfig文件，并重新运行安装程序。', mbError, MB_OK);
+      MsgBox('无法处理Kubeconfig文件。请确认文件格式正确或联系管理员获取帮助。', mbError, MB_OK);
       Exit;
     end;
 
