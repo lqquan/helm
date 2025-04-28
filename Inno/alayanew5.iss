@@ -483,26 +483,26 @@ begin
   SaveStringToFile(BatchFile,
     '@echo off' + #13#10 +
     'chcp 65001 > nul' + #13#10 +
-    'echo [时间] ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + ' > "' + LogFileAdmin + '.output"' + #13#10 +
-    'echo [命令] 开始执行获取管理员密码命令 >> "' + LogFileAdmin + '.output"' + #13#10 +
+    'echo [Time] ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + ' > "' + LogFileAdmin + '.output"' + #13#10 +
+    'echo [Command] Starting to execute admin password retrieval command >> "' + LogFileAdmin + '.output"' + #13#10 +
     'set KUBECONFIG=' + ExpandConstant('{app}\kubeconfig') + #13#10 +
-    'echo [命令] kubectl -n devtroncd get secret devtron-secret... >> "' + LogFileAdmin + '.output"' + #13#10 +
+    'echo [Command] kubectl -n devtroncd get secret devtron-secret... >> "' + LogFileAdmin + '.output"' + #13#10 +
     '"' + ExpandConstant('{app}\kubectl.exe') + '" -n devtroncd get secret devtron-secret -o jsonpath="{.data.ADMIN_PASSWORD}" > "' + TempInputFile + '" 2>&1' + #13#10 +
     'if %ERRORLEVEL% NEQ 0 (' + #13#10 +
-    '  echo [错误] 执行kubectl命令失败，错误代码: %ERRORLEVEL% >> "' + LogFileAdmin + '.output"' + #13#10 +
+    '  echo [Error] Failed to execute kubectl command, error code: %ERRORLEVEL% >> "' + LogFileAdmin + '.output"' + #13#10 +
     '  exit /b %ERRORLEVEL%' + #13#10 +
     ')' + #13#10 +
     'if exist "' + TempInputFile + '" (' + #13#10 +
-    '  echo [命令] 对密码进行base64解码 >> "' + LogFileAdmin + '.output"' + #13#10 +
+    '  echo [Command] Decoding password with base64 >> "' + LogFileAdmin + '.output"' + #13#10 +
     '  certutil -decode "' + TempInputFile + '" "' + TempOutputFile + '" > nul' + #13#10 +
     '  if %ERRORLEVEL% NEQ 0 (' + #13#10 +
-    '    echo [错误] base64解码失败，尝试PowerShell方式解码 >> "' + LogFileAdmin + '.output"' + #13#10 +
+    '    echo [Error] base64 decoding failed, attempting PowerShell decoding >> "' + LogFileAdmin + '.output"' + #13#10 +
     '  ) else (' + #13#10 +
-    '    echo [信息] base64解码成功 >> "' + LogFileAdmin + '.output"' + #13#10 +
+    '    echo [Info] base64 decoding successful >> "' + LogFileAdmin + '.output"' + #13#10 +
     '  )' + #13#10 +
     ')' + #13#10 +
-    'echo [完成] 命令执行结束 >> "' + LogFileAdmin + '.output"' + #13#10,
-    False);
+    'echo [Complete] Command execution finished >> "' + LogFileAdmin + '.output"' + #13#10,
+  False);
 
   // 执行批处理
   SaveStringToFile(LogFileAdmin, '【步骤2】执行批处理文件' + #13#10, True);
@@ -985,6 +985,7 @@ begin
     TempBatchFile := ExpandConstant('{app}\devtron_install.bat');
 
     // 构建批处理文件内容 - 通过分段提高可读性
+    // 构建批处理文件内容 - 通过分段提高可读性
     SaveStringToFile(TempBatchFile,
       '@echo off' + #13#10 +
       'setlocal enabledelayedexpansion' + #13#10 +
@@ -992,8 +993,8 @@ begin
       'cd /d "' + ExpandConstant('{app}\devtron') + '"' + #13#10 +
       'set KUBECONFIG=' + KubeconfigPath + #13#10 + #13#10 +
 
-      'echo [步骤1] 正在获取集群信息...' + #13#10 +
-      'echo [步骤1] 正在获取集群信息... >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      'echo [Step 1] Getting cluster information...' + #13#10 +
+      'echo [Step 1] Getting cluster information... >> "' + LogFile + '.output" 2>&1' + #13#10 +
       '"' + ExpandConstant('{app}\kubectl.exe') + '" config view > config_view.txt 2>&1' + #13#10 + #13#10 +
 
       'set "server_url="' + #13#10 +
@@ -1009,31 +1010,31 @@ begin
 
       ':server_found' + #13#10 +
       'if "!server_url!"=="" (' + #13#10 +
-      '    echo [错误] 在kubeconfig中未找到server字段！ >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      '    echo [Error] Server field not found in kubeconfig! >> "' + LogFile + '.output" 2>&1' + #13#10 +
       '    exit /b 1' + #13#10 +
       ')' + #13#10 + #13#10 +
 
-      'echo [步骤2] 开始安装Devtron...' + #13#10 +
-      'echo [步骤2] 开始安装Devtron... >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
+      'echo [Step 2] Starting Devtron installation...' + #13#10 +
+      'echo [Step 2] Starting Devtron installation... >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
 
-      'echo [步骤2.1] 清理现有安装（如果存在）... >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      'echo [Step 2.1] Cleaning up existing installation (if any)... >> "' + LogFile + '.output" 2>&1' + #13#10 +
       '"' + ExpandConstant('{app}\kubectl.exe') + '" delete namespace devtroncd >> "' + LogFile + '.output" 2>&1' + #13#10 +
       '"' + ExpandConstant('{app}\helm.exe') + '" uninstall devtron --namespace devtroncd >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
 
-      'echo [步骤2.2] 解析服务器参数... >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      'echo [Step 2.2] Parsing server parameters... >> "' + LogFile + '.output" 2>&1' + #13#10 +
       'for /f "tokens=2 delims=." %%a in ("!server_url!") do set "zoneID=%%a"' + #13#10 +
       'for /f "tokens=4 delims=/" %%a in ("!server_url!") do set "vksID=%%a"' + #13#10 + #13#10 +
 
-      'echo [信息] zoneID: !zoneID! >> "' + LogFile + '.output" 2>&1' + #13#10 +
-      'echo [信息] vksID: !vksID! >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
+      'echo [Info] zoneID: !zoneID! >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      'echo [Info] vksID: !vksID! >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
 
-      'echo [步骤2.3] 执行Helm安装... >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      'echo [Step 2.3] Executing Helm installation... >> "' + LogFile + '.output" 2>&1' + #13#10 +
       '"' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --set zoneID=!zoneID! --set vksID=!vksID! --set global.containerRegistry="registry.!zoneID!.alayanew.com:8443/vc-app_market/devtron" --timeout 300s >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
 
-      'echo [步骤2.4] 创建ConfigMap... >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      'echo [Step 2.4] Creating ConfigMap... >> "' + LogFile + '.output" 2>&1' + #13#10 +
       '"' + ExpandConstant('{app}\kubectl.exe') + '" create configmap devtron-global-config -n devtroncd --from-literal=vksID=!vksID! >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
 
-      'echo [完成] Devtron安装已完成 >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      'echo [Complete] Devtron installation completed >> "' + LogFile + '.output" 2>&1' + #13#10 +
       'echo Installation complete > "' + CompleteFlagFile + '"' + #13#10,
       False);
 
