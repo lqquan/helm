@@ -4,7 +4,7 @@
 ; 基本信息设置
 ;------------------------------------------------------------------------------
 #define MyAppName "AlayaNeWTools"
-#define MyAppVersion "1.0.8"
+#define MyAppVersion "1.0.9"
 #define MyAppPublisher "北京九章云极科技有限公司"
 #define MyAppURL "https://www.alayanew.com"
 #define MyAppExeName "AlayaNeWTools.exe"
@@ -14,25 +14,27 @@
 ; 安装程序设置
 ;------------------------------------------------------------------------------
 [Setup]
-AppId={{GUID-生成一个唯一ID}}
+AppId={{722653DA-F9EC-4C26-9C8B-9D7961BD020B}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={pf}\AlayaNewTools
+DefaultDirName={pf}\AlayaNeWTools
+ArchitecturesInstallIn64BitMode=x64
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=Output
 OutputBaseFilename=AlayaNeWTools
+DisableProgramGroupPage=yes
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
 DisableDirPage=no
 WizardSmallImageFile=D:/exe/123.bmp
-WizardImageFile=D:/exe/大.bmp
+WizardImageFile=D:/exe/big.bmp
 SetupIconFile=D:/exe/favicon.ico
 VersionInfoVersion={#MyAppVersion}
 DefaultDialogFontName=Microsoft YaHei
@@ -51,15 +53,15 @@ Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.i
 [Files]
 Source: "D:\exe\kubectl.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "D:\exe\helm.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "D:\exe\devtron\*"; DestDir: "{app}\devtron"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "D:\exe\devtron\*"; DestDir: "{app}\devtron"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: ShouldCreateIcons
 Source: "D:\exe\favicon.ico"; DestDir: "{app}"; DestName: "app_icon.ico"; Flags: ignoreversion
 
 ;------------------------------------------------------------------------------
 ; 快捷方式设置
 ;------------------------------------------------------------------------------
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\devtron_launcher.bat"; IconFilename: "{app}\app_icon.ico"; IconIndex: 0; Comment: "启动Devtron控制台"; WorkingDir: "{app}"
-Name: "{commondesktop}\Devtron控制台"; Filename: "{app}\devtron_launcher.bat"; IconFilename: "{app}\app_icon.ico"; IconIndex: 0; Comment: "启动Devtron控制台"; WorkingDir: "{app}"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\devtron_launcher.bat"; IconFilename: "{app}\app_icon.ico"; IconIndex: 0; Comment: "启动Devtron控制台"; WorkingDir: "{app}"; Check: ShouldCreateIcons
+Name: "{commondesktop}\Devtron控制台"; Filename: "{app}\devtron_launcher.bat"; IconFilename: "{app}\app_icon.ico"; IconIndex: 0; Comment: "启动Devtron控制台"; WorkingDir: "{app}"; Check: ShouldCreateIcons
 
 ;------------------------------------------------------------------------------
 ; 代码部分
@@ -67,6 +69,7 @@ Name: "{commondesktop}\Devtron控制台"; Filename: "{app}\devtron_launcher.bat"
 [Code]
 var
   KubeconfigPage: TInputFileWizardPage;
+  DevtronPage: TInputOptionWizardPage;  // 修正类型名称
   DevtronUrl: string;
   DevtronPassword: string;
   InstallTimer: TTimer;
@@ -82,11 +85,22 @@ procedure UpdateServiceProgress(Sender: TObject); forward;
 // 创建自定义页面
 procedure InitializeWizard;
 begin
+  // 创建Kubeconfig选择页面
   KubeconfigPage := CreateInputFilePage(wpSelectDir,
     '选择Kubeconfig文件',
     '请选择您的Kubeconfig文件，该文件将被配置为环境变量。此步骤是必需的。',
     '选择文件:');
   KubeconfigPage.Add('Kubeconfig文件 (必需):', 'JSON files|*.json|YAML files|*.yaml|YML files|*.yml|All files|*.*', '.json');
+
+  // 创建Devtron安装选项页面
+  DevtronPage := CreateInputOptionPage(KubeconfigPage.ID,
+    '安装Devtron',
+    '是否安装Devtron平台？',
+    '选择是否安装Devtron平台。安装后将创建桌面快捷方式以访问Devtron控制台。' + #13#10 + #13#10 +
+    '如果不安装，您仍然可以使用kubectl和helm工具来管理Kubernetes集群。',
+    False, False);
+  DevtronPage.Add('安装Devtron平台');
+  DevtronPage.Values[0] := True; // 默认选中
 end;
 
 // 验证用户是否选择了文件
@@ -100,6 +114,14 @@ begin
       MsgBox('请选择有效的Kubeconfig文件。此步骤是必需的，无法继续安装。', mbError, MB_OK);
       Result := False;
     end;
+  end
+  else if CurPageID = DevtronPage.ID then
+  begin
+    // 记录用户的选择，无需特别验证
+    if DevtronPage.Values[0] then
+      Log('用户选择安装Devtron: 是')
+    else
+      Log('用户选择安装Devtron: 否');
   end;
 end;
 
@@ -928,7 +950,11 @@ begin
   ProgressSimulationWithUIUpdate(LogFile);
 end;
 
-
+// 根据用户选择决定是否创建快捷方式
+function ShouldCreateIcons: Boolean;
+begin
+  Result := DevtronPage.Values[0];
+end;
 
 // 代替定时器实现的非阻塞安装
 function InstallDevtron: Boolean;
@@ -1031,7 +1057,7 @@ begin
     // 记录开始时间
     StartDateTime := Now;
     // 最大等待时间，单位为秒（例如，等待10分钟）
-    MaxWaitTime := 5 * 60;  // 10分钟
+    MaxWaitTime := 7 * 60;  // 10分钟
 
     // 循环等待安装完成，同时保持UI响应
     SaveStringToFile(LogFile, '【状态】等待安装过程完成...' + #13#10, True);
@@ -1147,21 +1173,19 @@ begin
         SaveStringToFile(LogFile, '【步骤5】KUBECONFIG测试通过' + #13#10, True);
       end;
 
-      // 安装Devtron
-      SaveStringToFile(LogFile, '【步骤6】开始安装Devtron' + #13#10, True);
-      SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
-
-      try
+      // 根据用户选择决定是否安装Devtron
+      if DevtronPage.Values[0] then
+      begin
+        SaveStringToFile(LogFile, '【信息】用户选择安装Devtron' + #13#10, True);
         if InstallDevtron() then
           SaveStringToFile(LogFile, '【成功】Devtron安装流程完成' + #13#10, True)
         else
           SaveStringToFile(LogFile, '【错误】Devtron安装流程执行失败' + #13#10, True);
-      except
-        begin
-          SaveStringToFile(LogFile, '【异常】Devtron安装时出现异常: '  + #13#10, True);
-          Log('安装Devtron时发生异常: ' );
-          MsgBox('安装Devtron时发生错误: '  + #13#10 + '请查看日志了解详情。', mbError, MB_OK);
-        end;
+      end
+      else
+      begin
+        SaveStringToFile(LogFile, '【信息】用户选择不安装Devtron' + #13#10, True);
+        MsgBox('已跳过Devtron安装。您仍然可以通过命令行工具（kubectl和helm）管理Kubernetes集群。', mbInformation, MB_OK);
       end;
     end
     else
