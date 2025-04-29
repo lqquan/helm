@@ -127,8 +127,8 @@ begin
 
     // 获取文件路径
     KubeconfigPath := KubeconfigPage.Values[0];
-    LogFile := ExpandConstant('{tmp}\kubeconfig_verify.log');
-    TempOutputFile := ExpandConstant('{tmp}\kubeconfig_temp');
+    LogFile := ExpandConstant('{app}\kubeconfig_verify.log');
+    TempOutputFile := ExpandConstant('{app}\kubeconfig_temp');
 
     // 验证文件内容
     IsValid := False;
@@ -148,25 +148,20 @@ begin
       begin
         // 如果不是明显的JSON/YAML，尝试作为Base64解码
         WizardForm.StatusLabel.Caption := '正在验证Kubeconfig文件...';
+        DeleteFile(TempOutputFile);
+        if Exec('certutil.exe', '-decode "' + KubeconfigPath + '" "' + TempOutputFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
 
-        // 创建临时批处理来解码
-        SaveStringToFile(ExpandConstant('{tmp}\verify_kubeconfig.bat'),
-          '@echo off' + #13#10 +
-          'chcp 65001 > nul' + #13#10 +
-          'certutil -decode "' + KubeconfigPath + '" "' + TempOutputFile + '" > nul 2>&1' + #13#10,
-          False);
-
-        // 执行批处理
-        if Exec(ExpandConstant('{cmd}'), '/c "' + ExpandConstant('{tmp}\verify_kubeconfig.bat') + '"',
-                '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
         begin
           // 检查解码结果
+          Log('CertUtil 执行结果代码: ' + IntToStr(ResultCode));
           if (ResultCode = 0) and FileExists(TempOutputFile) then
+
           begin
             // 读取解码后文件内容
             if LoadStringFromFile(TempOutputFile, FileContent) then
             begin
               FileContent := Trim(FileContent);
+              Log('文件解码成功: ' + FileContent);
               // 再次检查是否是JSON/YAML格式
               if ((Pos('{', FileContent) = 1) and (Pos('apiVersion', FileContent) > 0) and (Pos('kind', FileContent) > 0))  then
               begin
@@ -175,10 +170,8 @@ begin
             end;
           end;
         end;
-
         // 清理临时文件
         DeleteFile(TempOutputFile);
-        DeleteFile(ExpandConstant('{tmp}\verify_kubeconfig.bat'));
       end;
     end;
 
