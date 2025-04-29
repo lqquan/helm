@@ -148,6 +148,7 @@ begin
       begin
         // 如果不是明显的JSON/YAML，尝试作为Base64解码
         WizardForm.StatusLabel.Caption := '正在验证Kubeconfig文件...';
+        ForceDirectories(ExtractFileDir(TempOutputFile));
         DeleteFile(TempOutputFile);
         if Exec('certutil.exe', '-decode "' + KubeconfigPath + '" "' + TempOutputFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
 
