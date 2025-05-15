@@ -3,11 +3,11 @@
 ;------------------------------------------------------------------------------
 ; 基本信息设置
 ;------------------------------------------------------------------------------
-#define MyAppName "AlayaNeWTools"
+#define MyAppName "VKSTools"
 #define MyAppVersion "1.0.9"
 #define MyAppPublisher "北京九章云极科技有限公司"
 #define MyAppURL "https://www.alayanew.com"
-#define MyAppExeName "AlayaNeWTools.exe"
+#define MyAppExeName "VKSTools.exe"
 
 
 ;------------------------------------------------------------------------------
@@ -21,12 +21,12 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={pf}\AlayaNeWTools
+DefaultDirName={pf}\VKSTools
 ArchitecturesInstallIn64BitMode=x64
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=Output
-OutputBaseFilename=AlayaNeWTools
+OutputBaseFilename=VKSTools
 DisableProgramGroupPage=yes
 Compression=lzma
 SolidCompression=yes
