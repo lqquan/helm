@@ -4,7 +4,7 @@
 ; 基本信息设置
 ;------------------------------------------------------------------------------
 #define MyAppName "VKSTools"
-#define MyAppVersion "1.0.9"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "北京九章云极科技有限公司"
 #define MyAppURL "https://www.alayanew.com"
 #define MyAppExeName "VKSTools.exe"
@@ -210,7 +210,7 @@ var
   IsJsonOrYaml: Boolean;
 begin
   Result := False;
-  LogFile := ExpandConstant('{app}\base64_decode.log');
+  LogFile := ExpandConstant('{app}\devtron_install.log');
   TempOutputFile := ExpandConstant('{app}\kubeconfig_temp');
 
   // 初始化日志
@@ -989,6 +989,90 @@ begin
   Result := DevtronPage.Values[0];
 end;
 
+// 检查Kubernetes集群连接性
+function CheckKubernetesConnection: Boolean;
+var
+  LogFile, BatchFile: string;
+  ResultCode: Integer;
+  OutputContent: AnsiString;
+begin
+  Result := False; // 默认假设连接失败
+  LogFile := ExpandConstant('{app}\devtron_install.log');
+  BatchFile := ExpandConstant('{app}\check_k8s.bat');
+
+  // 创建检查脚本
+  SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+  SaveStringToFile(LogFile, '【开始】检查Kubernetes集群连接 - ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + #13#10, True);
+
+  SaveStringToFile(BatchFile,
+    '@echo off' + #13#10 +
+    'chcp 65001 > nul' + #13#10 +
+    'set KUBECONFIG=' + ExpandConstant('{app}\kubeconfig') + #13#10 +
+    //'echo [命令] 正在检查Kubernetes集群连接... > "' + LogFile + '.output"' + #13#10 +
+    '"' + ExpandConstant('{app}\kubectl.exe') + '" get nodes --request-timeout=10s > "' + ExpandConstant('{app}\k8s_check.txt') + '" 2>&1' + #13#10,
+    False);
+
+  // 执行检查
+  WizardForm.StatusLabel.Caption := '正在检查Kubernetes集群连接...';
+  if not Exec(ExpandConstant('{cmd}'), '/c "' + BatchFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    SaveStringToFile(LogFile, '【错误】执行检查命令失败' + #13#10, True);
+    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+
+    // 显示连接失败消息
+    MsgBox('无法执行Kubernetes连接检查命令，请确认kubeconfig文件配置正确。', mbError, MB_OK);
+    Exit;
+  end;
+
+  // 检查结果
+  if ResultCode <> 0 then
+  begin
+    SaveStringToFile(LogFile, '【错误】kubectl命令返回非零代码: ' + IntToStr(ResultCode) + #13#10, True);
+    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+
+    // 显示连接失败消息
+    //MsgBox('连接Kubernetes集群失败，请重新选择kubeconfig文件或检查网络连接。');
+    Exit;
+  end;
+
+  // 读取输出内容
+  if not LoadStringFromFile(ExpandConstant('{app}\k8s_check.txt'), OutputContent) then
+  begin
+    SaveStringToFile(LogFile, '【错误】无法读取检查输出' + #13#10, True);
+    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+
+    // 显示连接失败消息
+    MsgBox('无法读取Kubernetes连接检查结果，请重试。', mbError, MB_OK);
+    Exit;
+  end;
+
+  // 检查输出中是否有错误信息
+  if (Pos('Unable to connect', OutputContent) > 0) or
+     (Pos('error', OutputContent) > 0) or
+     (Pos('Error', OutputContent) > 0) or
+     (Pos('timeout', OutputContent) > 0) or
+     (Pos('unreachable', OutputContent) > 0) or
+     (Pos('connection refused', OutputContent) > 0) then
+  begin
+    SaveStringToFile(LogFile, '【错误】集群连接错误: ' + OutputContent + #13#10, True);
+    SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+
+    // 显示具体的连接错误
+    MsgBox('连接Kubernetes集群失败，错误信息: ' + Copy(OutputContent, 1, 200) +
+          '。请重新选择kubeconfig文件或检查集群状态。', mbError, MB_OK);
+    Exit;
+  end;
+
+  // 检查通过
+  SaveStringToFile(LogFile, '【成功】Kubernetes集群连接正常' + #13#10, True);
+  SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+  Result := True; // 连接成功
+
+  // 清理临时文件
+  DeleteFile(BatchFile);
+  DeleteFile(ExpandConstant('{app}\k8s_check.txt'));
+end;
+
 // 代替定时器实现的非阻塞安装
 function InstallDevtron: Boolean;
 var
@@ -997,6 +1081,7 @@ var
   StartDateTime, CurrentDateTime: TDateTime;
   ElapsedSeconds: Integer;
   MaxWaitTime: Integer;
+  FileContent: AnsiString;
 begin
   Result := False;
 
@@ -1014,6 +1099,25 @@ begin
     SaveStringToFile(LogFile, '【开始安装】Devtron安装开始 - ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + #13#10, True);
     SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
 
+    // 先检查Kubernetes连接
+    SaveStringToFile(LogFile, '【步骤1】检查Kubernetes集群连接' + #13#10, True);
+    if not CheckKubernetesConnection then
+    begin
+      // 连接失败，记录日志
+      SaveStringToFile(LogFile, '【警告】无法连接到Kubernetes集群，无法继续安装' + #13#10, True);
+      SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+
+      // 显示消息通知用户
+      MsgBox('无法连接到Kubernetes集群，请检查网络连接或重新选择其他kubeconfig文件。安装将终止。', mbError, MB_OK);
+
+      // 返回失败结果
+      Result := False;
+      Exit;
+    end;
+
+    // 连接成功，继续安装
+    SaveStringToFile(LogFile, '【步骤1】Kubernetes集群连接正常，继续安装' + #13#10, True);
+
     // 创建安装批处理文件
     TempBatchFile := ExpandConstant('{app}\devtron_install.bat');
 
@@ -1026,7 +1130,7 @@ begin
       'set KUBECONFIG=' + KubeconfigPath + #13#10 + #13#10 +
 
       'echo [Step 1] Getting cluster information...' + #13#10 +
-      'echo [Step 1] Getting cluster information... >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      'echo [Step 1] Getting cluster information... >> "' + LogFile + '" 2>&1' + #13#10 +
       '"' + ExpandConstant('{app}\kubectl.exe') + '" config view > config_view.txt 2>&1' + #13#10 + #13#10 +
 
       'set "server_url="' + #13#10 +
@@ -1047,27 +1151,42 @@ begin
       ')' + #13#10 + #13#10 +
 
       'echo [Step 2] Starting Devtron installation...' + #13#10 +
-      'echo [Step 2] Starting Devtron installation... >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
+      'echo [Step 2] Starting Devtron installation... >> "' + LogFile + '" 2>&1' + #13#10 + #13#10 +
 
-      'echo [Step 2.1] Cleaning up existing installation (if any)... >> "' + LogFile + '.output" 2>&1' + #13#10 +
-      '"' + ExpandConstant('{app}\kubectl.exe') + '" delete namespace devtroncd >> "' + LogFile + '.output" 2>&1' + #13#10 +
-      '"' + ExpandConstant('{app}\helm.exe') + '" uninstall devtron --namespace devtroncd >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
+      'echo [Step 2.1] Cleaning up existing installation (if any)... >> "' + LogFile + '" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\kubectl.exe') + '" delete namespace devtroncd >> "' + LogFile + '" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\helm.exe') + '" uninstall devtron --namespace devtroncd >> "' + LogFile + '" 2>&1' + #13#10 +
 
-      'echo [Step 2.2] Parsing server parameters... >> "' + LogFile + '.output" 2>&1' + #13#10 +
+
+      'echo [Step 2.2] Parsing server parameters... >> "' + LogFile + '" 2>&1' + #13#10 +
       'for /f "tokens=2 delims=." %%a in ("!server_url!") do set "zoneID=%%a"' + #13#10 +
       'for /f "tokens=4 delims=/" %%a in ("!server_url!") do set "vksID=%%a"' + #13#10 + #13#10 +
 
-      'echo [Info] zoneID: !zoneID! >> "' + LogFile + '.output" 2>&1' + #13#10 +
-      'echo [Info] vksID: !vksID! >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
+      'echo [Info] zoneID: !zoneID! >> "' + LogFile + '" 2>&1' + #13#10 +
+      'echo [Info] vksID: !vksID! >> "' + LogFile + '" 2>&1' + #13#10 + #13#10 +
 
-      'echo [Step 2.3] Executing Helm installation... >> "' + LogFile + '.output" 2>&1' + #13#10 +
-      '"' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --set zoneID=!zoneID! --set vksID=!vksID! --set global.containerRegistry="registry.!zoneID!.alayanew.com:8443/vc-app_market/devtron" --timeout 300s >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
+      'echo [Step 2.3] Executing Helm installation... >> "' + LogFile + '" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --set zoneID=!zoneID! --set vksID=!vksID! --set global.containerRegistry="registry.!zoneID!.alayanew.com:8443/vc-app_market/devtron" --timeout 300s >> "' + LogFile + '" 2>&1' + #13#10 +
+      'if %errorlevel% neq  0 (' + #13#10 +
+      '    echo [Warning] Helm installation failed, retrying in 10 seconds... >> "' + LogFile + '" 2>&1' + #13#10 +
+      '    timeout /t 10 > nul' + #13#10 +
+      '    echo [Step 2.3] Retrying Helm installation... >> "' + LogFile + '" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\kubectl.exe') + '" delete namespace devtroncd >> "' + LogFile + '" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\helm.exe') + '" uninstall devtron --namespace devtroncd >> "' + LogFile + '" 2>&1' + #13#10 +
+      '    "' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --set zoneID=!zoneID! --set vksID=!vksID! --set global.containerRegistry="registry.!zoneID!.alayanew.com:8443/vc-app_market/devtron" --timeout 300s >> "' + LogFile + '" 2>&1' + #13#10 +
+      '    if %errorlevel% neq 0 (' + #13#10 +
+      '        echo [Error] Helm installation failed after retry, aborting installation >> "' + LogFile + '" 2>&1' + #13#10 +
+      '        echo INSTALL_FAILED > "' + CompleteFlagFile + '"' + #13#10 +
+      '        exit /b 1' + #13#10 +
+      '    )' + #13#10 +
+      ')' + #13#10 + #13#10 +
 
-      'echo [Step 2.4] Creating ConfigMap... >> "' + LogFile + '.output" 2>&1' + #13#10 +
-      '"' + ExpandConstant('{app}\kubectl.exe') + '" create configmap devtron-global-config -n devtroncd --from-literal=vksID=!vksID! >> "' + LogFile + '.output" 2>&1' + #13#10 + #13#10 +
+      'echo [Step 2.4] Creating ConfigMap... >> "' + LogFile + '" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\kubectl.exe') + '" create configmap devtron-global-config -n devtroncd --from-literal=vksID=!vksID! >> "' + LogFile + '" 2>&1' + #13#10 + #13#10 +
 
-      'echo [Complete] Devtron installation completed >> "' + LogFile + '.output" 2>&1' + #13#10 +
-      'echo Installation complete > "' + CompleteFlagFile + '"' + #13#10,
+      'echo [Complete] Devtron installation completed >> "' + LogFile + '" 2>&1' + #13#10 +
+      'echo Installation complete > "' + CompleteFlagFile + '"' + #13#10 +
+      'exit /b 0' + #13#10,
       False);
 
     // 在执行安装命令之前添加进度条准备
@@ -1081,7 +1200,7 @@ begin
     begin
       Log('启动Devtron安装失败');
       SaveStringToFile(LogFile, '【错误】无法启动安装程序，错误代码: ' + IntToStr(ResultCode) + '，错误类型: mbError' + #13#10, True);
-      //MsgBox('无法启动Devtron安装程序。错误代码: ' + IntToStr(ResultCode), mbError, MB_OK);
+      MsgBox('无法启动Devtron安装程序。错误代码: ' + IntToStr(ResultCode), mbError, MB_OK);
       WizardForm.ProgressGauge.Style := npbstNormal;
       WizardForm.ProgressGauge.Position := 0;
       Exit;
@@ -1090,7 +1209,7 @@ begin
     // 记录开始时间
     StartDateTime := Now;
     // 最大等待时间，单位为秒（例如，等待10分钟）
-    MaxWaitTime := 7 * 60;  // 10分钟
+    MaxWaitTime := 7 * 60;  // 7分钟
 
     // 循环等待安装完成，同时保持UI响应
     SaveStringToFile(LogFile, '【状态】等待安装过程完成...' + #13#10, True);
@@ -1123,7 +1242,29 @@ begin
       Sleep(50);
     end;
 
-    // 安装完成
+    // 检查安装是否失败
+    if LoadStringFromFile(CompleteFlagFile, FileContent) and (Pos('INSTALL_FAILED', FileContent) > 0) then
+    begin
+      // 安装失败
+      WizardForm.ProgressGauge.Style := npbstNormal;
+      WizardForm.ProgressGauge.Position := 0;
+      WizardForm.StatusLabel.Caption := 'Devtron安装失败';
+
+      // 记录安装失败
+      SaveStringToFile(LogFile, '【安装失败】Helm安装重试后仍然失败，用时' + IntToStr(ElapsedSeconds) + '秒' + #13#10, True);
+      SaveStringToFile(LogFile, '【信息】安装无法继续' + #13#10, True);
+      SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
+
+      // 提示用户安装失败
+      MsgBox('Devtron安装失败，请检查网络连接或集群状态，然后重新选择kubeconfig文件重试。', mbError, MB_OK);
+
+      // 清理完成标志文件
+      DeleteFile(CompleteFlagFile);
+      Result := False;
+      Exit;
+    end;
+
+    // 安装成功
     DeleteFile(CompleteFlagFile);
     WizardForm.ProgressGauge.Style := npbstNormal;
     WizardForm.ProgressGauge.Position := 100;
@@ -1138,13 +1279,13 @@ begin
 
     Result := True;
   except
-    //on E: Exception do
+   // on E: Exception do
     begin
       // 详细记录错误信息
       Log('安装Devtron时发生错误: ' );
       SaveStringToFile(LogFile, '【错误】安装过程中出现异常: '  + #13#10, True);
       SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
-      //MsgBox('安装Devtron时发生错误: '  + #13#10 + '请检查日志了解详情。', mbError, MB_OK);
+      //MsgBox('安装Devtron时发生错误: ' + E.Message + #13#10 + '请检查日志了解详情。', mbError, MB_OK);
     end;
   end;
 end;
@@ -1163,7 +1304,7 @@ begin
   if CurStep = ssPostInstall then
   begin
     // 初始化日志文件
-    LogFile := ExpandConstant('{app}\setup_post_install.log');
+    LogFile := ExpandConstant('{app}\devtron_install.log');
     SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
     SaveStringToFile(LogFile, '【开始】安装后处理流程 - ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + #13#10, True);
     SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
