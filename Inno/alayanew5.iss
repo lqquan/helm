@@ -4,7 +4,7 @@
 ; 基本信息设置
 ;------------------------------------------------------------------------------
 #define MyAppName "VKSTools"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "1.1.2"
 #define MyAppPublisher "北京九章云极科技有限公司"
 #define MyAppURL "https://www.alayanew.com"
 #define MyAppExeName "VKSTools.exe"
@@ -137,7 +137,7 @@ begin
     // 如果包含中文字符，显示错误消息并阻止进入下一步
     if HasChineseChar then
     begin
-      MsgBox('安装路径不能包含中文字符，请选择仅包含英文字母、数字和基本符号的路径。', mbError, MB_OK);
+      MsgBox('安装路径不能包含中文字符。', mbError, MB_OK);
       Result := False;
       Exit;
     end;
