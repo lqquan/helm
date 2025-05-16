@@ -400,7 +400,7 @@ var
   LogFile: string;
 begin
   Result := '';
-  LogFile := ExpandConstant('{app}\url_extract.log');
+  LogFile := ExpandConstant('{app}\devtron_install.log');
 
   // 记录URL提取开始
   SaveStringToFile(LogFile, '==========================================' + #13#10, True);
@@ -505,7 +505,7 @@ begin
   TempInputFile := ExpandConstant('{app}\admin_pwd_input.txt');
   TempOutputFile := ExpandConstant('{app}\admin_pwd_output.txt');
   BatchFile := ExpandConstant('{app}\get_admin_pwd.bat');
-  LogFileAdmin := ExpandConstant('{app}\adminPassword.log');
+  LogFileAdmin := ExpandConstant('{app}\devtron_install.log');
 
   // 记录操作日志
   SaveStringToFile(LogFileAdmin, '==========================================' + #13#10, True);
@@ -516,25 +516,25 @@ begin
   SaveStringToFile(BatchFile,
     '@echo off' + #13#10 +
     'chcp 65001 > nul' + #13#10 +
-    'echo [Time] ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + ' > "' + LogFileAdmin + '.output"' + #13#10 +
-    'echo [Command] Starting to execute admin password retrieval command >> "' + LogFileAdmin + '.output"' + #13#10 +
+    'echo [Time] ' + GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + ' >> "' + LogFileAdmin + '"' + #13#10 +
+    'echo [Command] Starting to execute admin password retrieval command >> "' + LogFileAdmin + '"' + #13#10 +
     'set KUBECONFIG=' + ExpandConstant('{app}\kubeconfig') + #13#10 +
-    'echo [Command] kubectl -n devtroncd get secret devtron-secret... >> "' + LogFileAdmin + '.output"' + #13#10 +
+    'echo [Command] kubectl -n devtroncd get secret devtron-secret... >> "' + LogFileAdmin + '"' + #13#10 +
     '"' + ExpandConstant('{app}\kubectl.exe') + '" -n devtroncd get secret devtron-secret -o jsonpath="{.data.ADMIN_PASSWORD}" > "' + TempInputFile + '" 2>&1' + #13#10 +
     'if %ERRORLEVEL% NEQ 0 (' + #13#10 +
-    '  echo [Error] Failed to execute kubectl command, error code: %ERRORLEVEL% >> "' + LogFileAdmin + '.output"' + #13#10 +
+    '  echo [Error] Failed to execute kubectl command, error code: %ERRORLEVEL% >> "' + LogFileAdmin + '"' + #13#10 +
     '  exit /b %ERRORLEVEL%' + #13#10 +
     ')' + #13#10 +
     'if exist "' + TempInputFile + '" (' + #13#10 +
-    '  echo [Command] Decoding password with base64 >> "' + LogFileAdmin + '.output"' + #13#10 +
+    '  echo [Command] Decoding password with base64 >> "' + LogFileAdmin + '"' + #13#10 +
     '  certutil -decode "' + TempInputFile + '" "' + TempOutputFile + '" > nul' + #13#10 +
     '  if %ERRORLEVEL% NEQ 0 (' + #13#10 +
-    '    echo [Error] base64 decoding failed, attempting PowerShell decoding >> "' + LogFileAdmin + '.output"' + #13#10 +
+    '    echo [Error] base64 decoding failed, attempting PowerShell decoding >> "' + LogFileAdmin + '"' + #13#10 +
     '  ) else (' + #13#10 +
-    '    echo [Info] base64 decoding successful >> "' + LogFileAdmin + '.output"' + #13#10 +
+    '    echo [Info] base64 decoding successful >> "' + LogFileAdmin + '"' + #13#10 +
     '  )' + #13#10 +
     ')' + #13#10 +
-    'echo [Complete] Command execution finished >> "' + LogFileAdmin + '.output"' + #13#10,
+    'echo [Complete] Command execution finished >> "' + LogFileAdmin + '"' + #13#10,
     False);
 
   // 执行批处理
@@ -558,12 +558,12 @@ begin
       SaveStringToFile(BatchFile,
         '@echo off' + #13#10 +
         'chcp 65001 > nul' + #13#10 +
-        'echo [命令] 使用PowerShell进行base64解码 >> "' + LogFileAdmin + '.output"' + #13#10 +
+        'echo [命令] 使用PowerShell进行base64解码 >> "' + LogFileAdmin + '"' + #13#10 +
         'powershell -Command "[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(''' + Trim(OutputContent) + '''))" > "' + TempOutputFile + '"' + #13#10 +
         'if %ERRORLEVEL% NEQ 0 (' + #13#10 +
-        '  echo [错误] PowerShell解码失败，错误代码: %ERRORLEVEL% >> "' + LogFileAdmin + '.output"' + #13#10 +
+        '  echo [错误] PowerShell解码失败，错误代码: %ERRORLEVEL% >> "' + LogFileAdmin + '"' + #13#10 +
         ') else (' + #13#10 +
-        '  echo [信息] PowerShell解码成功 >> "' + LogFileAdmin + '.output"' + #13#10 +
+        '  echo [信息] PowerShell解码成功 >> "' + LogFileAdmin + '"' + #13#10 +
         ')' + #13#10,
         False);
 
@@ -611,7 +611,7 @@ var
   ResultCode: Integer;
 begin
   ScriptPath := ExpandConstant('{app}\devtron_launcher.bat');
-  LogFile := ExpandConstant('{app}\launcher_script.log');
+  LogFile := ExpandConstant('{app}\devtron_install.log');
   AnsiScriptFile := ExpandConstant('{app}\launcher_ansi.txt');
 
   // 记录创建启动脚本
@@ -817,7 +817,7 @@ begin
     '@echo off' + #13#10 +
     'chcp 65001 > nul' + #13#10 +
     'set KUBECONFIG=' + KubeconfigPath + #13#10 +
-    'echo [命令] kubectl describe serviceexporter devtron-itf -n devtroncd > "' + ExpandConstant('{app}\url_command.log') + '" 2>&1' + #13#10 +
+    'echo [命令] kubectl describe serviceexporter devtron-itf -n devtroncd > "' + ExpandConstant('{app}\devtron_install.log') + '" 2>&1' + #13#10 +
     '"' + ExpandConstant('{app}\kubectl.exe') + '" describe serviceexporter devtron-itf -n devtroncd > "' +
     ExpandConstant('{app}\devtron_url.txt') + '" 2>&1' + #13#10,
     False);
@@ -917,7 +917,7 @@ begin
       '@echo off' + #13#10 +
       'chcp 65001 > nul' + #13#10 +
       'set KUBECONFIG=' + KubeconfigPath + #13#10 +
-      'echo [命令] kubectl describe serviceexporter devtron-itf -n devtroncd > "' + ExpandConstant('{app}\url_command.log') + '" 2>&1' + #13#10 +
+      'echo [命令] kubectl describe serviceexporter devtron-itf -n devtroncd > "' + ExpandConstant('{app}\devtron_install.log') + '" 2>&1' + #13#10 +
       '"' + ExpandConstant('{app}\kubectl.exe') + '" describe serviceexporter devtron-itf -n devtroncd > "' +
       ExpandConstant('{app}\devtron_url.txt') + '" 2>&1' + #13#10,
       False);
@@ -961,7 +961,7 @@ var
   LogFile: string;
 begin
   // 记录日志文件路径
-  LogFile := ExpandConstant('{app}\devtron_service.log');
+  LogFile := ExpandConstant('{app}\devtron_install.log');
 
   // 记录服务启动开始
   SaveStringToFile(LogFile, '===========================================================' + #13#10, True);
@@ -1146,7 +1146,7 @@ begin
 
       ':server_found' + #13#10 +
       'if "!server_url!"=="" (' + #13#10 +
-      '    echo [Error] Server field not found in kubeconfig! >> "' + LogFile + '.output" 2>&1' + #13#10 +
+      '    echo [Error] Server field not found in kubeconfig! >> "' + LogFile + '" 2>&1' + #13#10 +
       '    exit /b 1' + #13#10 +
       ')' + #13#10 + #13#10 +
 
@@ -1166,21 +1166,37 @@ begin
       'echo [Info] vksID: !vksID! >> "' + LogFile + '" 2>&1' + #13#10 + #13#10 +
 
       'echo [Step 2.3] Executing Helm installation... >> "' + LogFile + '" 2>&1' + #13#10 +
+      'echo [Step 2.3.2] Installing Helm chart... >> "' + LogFile + '" 2>&1' + #13#10 +
       '"' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --set zoneID=!zoneID! --set vksID=!vksID! --set global.containerRegistry="registry.!zoneID!.alayanew.com:8443/vc-app_market/devtron" --timeout 300s >> "' + LogFile + '" 2>&1' + #13#10 +
-      'if %errorlevel% neq  0 (' + #13#10 +
-      '    echo [Warning] Helm installation failed, retrying in 10 seconds... >> "' + LogFile + '" 2>&1' + #13#10 +
-      '    timeout /t 10 > nul' + #13#10 +
-      '    echo [Step 2.3] Retrying Helm installation... >> "' + LogFile + '" 2>&1' + #13#10 +
-      '"' + ExpandConstant('{app}\kubectl.exe') + '" delete namespace devtroncd >> "' + LogFile + '" 2>&1' + #13#10 +
-      '"' + ExpandConstant('{app}\helm.exe') + '" uninstall devtron --namespace devtroncd >> "' + LogFile + '" 2>&1' + #13#10 +
-      '    "' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --set zoneID=!zoneID! --set vksID=!vksID! --set global.containerRegistry="registry.!zoneID!.alayanew.com:8443/vc-app_market/devtron" --timeout 300s >> "' + LogFile + '" 2>&1' + #13#10 +
-      '    if %errorlevel% neq 0 (' + #13#10 +
-      '        echo [Error] Helm installation failed after retry, aborting installation >> "' + LogFile + '" 2>&1' + #13#10 +
-      '        echo INSTALL_FAILED > "' + CompleteFlagFile + '"' + #13#10 +
-      '        exit /b 1' + #13#10 +
-      '    )' + #13#10 +
+      'timeout /t 5 > nul' + #13#10 +
+      '"' + ExpandConstant('{app}\helm.exe') + '" status devtron -n devtroncd  >> "' + LogFile + '" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\helm.exe') + '" status devtron -n devtroncd  | findstr /C:"STATUS: deployed"' + #13#10 +
+      'if not errorlevel 1 (' + #13#10 +
+      '    echo [Info] Helm installation successful >> "' + LogFile + '" 2>&1' + #13#10 +
+      '    goto :installation_success' + #13#10 +
       ')' + #13#10 + #13#10 +
 
+      'echo [Warning] Helm installation failed, retrying in 10 seconds... >> "' + LogFile + '" 2>&1' + #13#10 +
+      'timeout /t 10 > nul' + #13#10 +
+      'echo [Step 2.3] Retrying Helm installation... >> "' + LogFile + '" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\kubectl.exe') + '" delete namespace devtroncd >> "' + LogFile + '" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\helm.exe') + '" uninstall devtron --namespace devtroncd >> "' + LogFile + '" 2>&1' + #13#10 +
+      'timeout /t 5 > nul' + #13#10 +
+      'echo [Step 2.3.3] Retrying Helm installation with the new namespace... >> "' + LogFile + '" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --set zoneID=!zoneID! --set vksID=!vksID! --set global.containerRegistry="registry.!zoneID!.alayanew.com:8443/vc-app_market/devtron" --timeout 300s >> "' + LogFile + '" 2>&1' + #13#10 +
+      'timeout /t 10 > nul' + #13#10 +
+      '"' + ExpandConstant('{app}\helm.exe') + '" status devtron -n devtroncd >> "' + LogFile + '" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\helm.exe') + '" status devtron -n devtroncd | findstr /C:"STATUS: deployed"' + #13#10 +
+      'if not errorlevel 1 (' + #13#10 +
+      '    echo [Info] Retry successful >> "' + LogFile + '" 2>&1' + #13#10 +
+      '    goto :installation_success' + #13#10 +
+      ')' + #13#10 + #13#10 +
+
+      'echo [Error] Helm installation failed after retry, aborting installation >> "' + LogFile + '" 2>&1' + #13#10 +
+      'echo INSTALL_FAILED > "' + CompleteFlagFile + '"' + #13#10 +
+      'exit /b 1' + #13#10 + #13#10 +
+
+      ':installation_success' + #13#10 +
       'echo [Step 2.4] Creating ConfigMap... >> "' + LogFile + '" 2>&1' + #13#10 +
       '"' + ExpandConstant('{app}\kubectl.exe') + '" create configmap devtron-global-config -n devtroncd --from-literal=vksID=!vksID! >> "' + LogFile + '" 2>&1' + #13#10 + #13#10 +
 
