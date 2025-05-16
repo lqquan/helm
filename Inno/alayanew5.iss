@@ -1154,7 +1154,7 @@ begin
       'echo [Step 2] Starting Devtron installation... >> "' + LogFile + '" 2>&1' + #13#10 + #13#10 +
 
       'echo [Step 2.1] Cleaning up existing installation (if any)... >> "' + LogFile + '" 2>&1' + #13#10 +
-      '"' + ExpandConstant('{app}\kubectl.exe') + '" delete namespace devtroncd >> "' + LogFile + '" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\kubectl.exe') + '" delete namespace devtroncd  --grace-period=0  >> "' + LogFile + '" 2>&1' + #13#10 +
       '"' + ExpandConstant('{app}\helm.exe') + '" uninstall devtron --namespace devtroncd >> "' + LogFile + '" 2>&1' + #13#10 +
 
 
@@ -1164,7 +1164,7 @@ begin
 
       'echo [Info] zoneID: !zoneID! >> "' + LogFile + '" 2>&1' + #13#10 +
       'echo [Info] vksID: !vksID! >> "' + LogFile + '" 2>&1' + #13#10 + #13#10 +
-
+      'timeout /t 5 > nul' + #13#10 +
       'echo [Step 2.3] Executing Helm installation... >> "' + LogFile + '" 2>&1' + #13#10 +
       'echo [Step 2.3.2] Installing Helm chart... >> "' + LogFile + '" 2>&1' + #13#10 +
       '"' + ExpandConstant('{app}\helm.exe') + '" install devtron . --create-namespace -n devtroncd --values resources.yaml --set zoneID=!zoneID! --set vksID=!vksID! --set global.containerRegistry="registry.!zoneID!.alayanew.com:8443/vc-app_market/devtron" --timeout 300s >> "' + LogFile + '" 2>&1' + #13#10 +
@@ -1177,9 +1177,9 @@ begin
       ')' + #13#10 + #13#10 +
 
       'echo [Warning] Helm installation failed, retrying in 10 seconds... >> "' + LogFile + '" 2>&1' + #13#10 +
-      'timeout /t 10 > nul' + #13#10 +
+      'timeout /t 5 > nul' + #13#10 +
       'echo [Step 2.3] Retrying Helm installation... >> "' + LogFile + '" 2>&1' + #13#10 +
-      '"' + ExpandConstant('{app}\kubectl.exe') + '" delete namespace devtroncd >> "' + LogFile + '" 2>&1' + #13#10 +
+      '"' + ExpandConstant('{app}\kubectl.exe') + '" delete namespace devtroncd  --grace-period=0 >> "' + LogFile + '" 2>&1' + #13#10 +
       '"' + ExpandConstant('{app}\helm.exe') + '" uninstall devtron --namespace devtroncd >> "' + LogFile + '" 2>&1' + #13#10 +
       'timeout /t 5 > nul' + #13#10 +
       'echo [Step 2.3.3] Retrying Helm installation with the new namespace... >> "' + LogFile + '" 2>&1' + #13#10 +
