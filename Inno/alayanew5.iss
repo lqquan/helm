@@ -112,8 +112,36 @@ var
   LogFile: string;
   FileContent: AnsiString;
   IsValid: Boolean;
+  i: Integer;
+  InstallPath: string;
+  HasChineseChar: Boolean;
 begin
   Result := True;
+
+  // 检查安装路径是否包含中文
+  if CurPageID = wpSelectDir then
+  begin
+    InstallPath := WizardDirValue;
+    HasChineseChar := False;
+
+    // 逐字符检查是否包含中文字符
+    for i := 1 to Length(InstallPath) do
+    begin
+      if Ord(InstallPath[i]) > 127 then
+      begin
+        HasChineseChar := True;
+        Break;
+      end;
+    end;
+
+    // 如果包含中文字符，显示错误消息并阻止进入下一步
+    if HasChineseChar then
+    begin
+      MsgBox('安装路径不能包含中文字符，请选择仅包含英文字母、数字和基本符号的路径。', mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
+  end;
 
   if CurPageID = KubeconfigPage.ID then
   begin
