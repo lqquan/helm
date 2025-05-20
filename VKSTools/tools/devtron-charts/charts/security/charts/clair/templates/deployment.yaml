@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "clair.fullname" . }}
+  labels:
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+    app: clair
+    integration: security
+{{ toYaml .Values.labels | indent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ template "clair.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "clair.fullname" . }}
+        heritage: {{ .Release.Service | quote }}
+        release: {{ .Release.Name | quote }}
+        chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+        integration: security
+{{ toYaml .Values.labels | indent 8 }}
+    spec:
+      {{- include "common.schedulerConfig" (dict "nodeSelector" $.Values.nodeSelector "tolerations" $.Values.tolerations "imagePullSecrets" $.Values.imagePullSecrets "global" $.Values.global) | indent 6 }}
+      serviceAccountName: devtron-default-sa
+      volumes:
+      - name: "{{ .Chart.Name }}-config"
+        secret:
+          secretName: {{ template "clair.fullname" . }}
+      initContainers:
+      - name: pg-ready-wait
+        image: {{ include "common.clair.image" (dict "component" $.Values.image "global" $.Values.global "extraImage" $.Values.image.initContainer.image "extraImageTag" $.Values.image.initContainer.tag ) }}
+        command: [ "sh", "-c",
+          "until pg_isready -h {{ .Values.config.postgresHost }} -p {{ .Values.config.postgresPort }};
+          do echo waiting for database; sleep 1; done;"]
+      containers:
+      - name: {{ .Chart.Name }}
+        image: {{ include "common.clair.image" (dict "component" $.Values.image "global" $.Values.global ) }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- if .Values.extraEnv }}
+        env: {{ toYaml .Values.extraEnv | nindent 8 }}
+        {{- end }}
+{{- if and $.Values.extraArgs $.Values.insecureTls }}
+        args:
+        - "--insecure-tls"
+{{ toYaml .Values.extraArgs | indent 8 }}
+{{- else if $.Values.insecureTls }}
+        args: 
+        - "--insecure-tls"
+{{- else if $.Values.extraArgs }}
+        args:
+{{ toYaml .Values.extraArgs | indent 8 }}
+{{- end }}
+        ports:
+        - name: "{{ .Chart.Name }}-api"
+          containerPort: {{ .Values.service.internalApiPort }}
+          protocol: TCP
+        - name: "{{ .Chart.Name }}-health"
+          containerPort: {{ .Values.service.internalHealthPort }}
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.service.internalHealthPath }}
+            port: {{ .Values.service.internalHealthPort }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.service.internalHealthPath }}
+            port: {{ .Values.service.internalHealthPort }}
+        volumeMounts:
+        - name: "{{ .Chart.Name }}-config"
+          mountPath: /etc/clair
+          readOnly: true
+        resources:
+{{ toYaml .Values.resources | indent 10 }}

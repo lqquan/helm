@@ -1,0 +1,84 @@
+global:
+  containerRegistry: "quay.io/devtron"
+  # These values can be configured as per usecase
+  # nodeSelector:
+  #   key: value
+  # tolerations:
+  #   - key: "key1"
+  #     operator: "Equal"
+  #     value: "value1"
+  #     effect: "NoSchedule"
+  # imagePullSecrets:
+  #     - name: yoursecret
+
+config:
+  postgresHost: postgresql-postgresql.devtroncd
+  postgresPort: 5432
+  postgresdbname: clairv4
+  postgresUser: postgres
+  postgresPassword: ""
+  introspection_addr: :6061
+  http_listen_addr: :6060
+  log_level: debug
+  indexer:
+    scanlock_retry: 10
+    layer_scan_concurrency: 5
+    migrations: true
+    extraConfig: {}
+  matcher:
+    indexer_addr: :6060
+    max_conn_pool: 100
+    migrations: true
+    clairUpdaterSets:
+    - alpine
+    - aws
+    - debian
+    - oracle
+    - photon
+    - pyupio
+    - rhel
+    - suse
+    - ubuntu
+    extraConfig: {}
+  notifier:
+    delivery_interval: 1m
+    poll_interval: 5m
+    migrations: true
+    extraConfig: {}
+image:
+  pullPolicy: IfNotPresent
+  repository: clair
+  tag: 4.3.6
+  initContainer:
+    image:  postgres
+    tag: "11.3"
+ingress:
+  annotations: null
+  enabled: false
+  hosts:
+  - chart-example.local
+  tls: null
+insecureTls: false
+replicaCount: 1
+labels:
+  component: clair
+resources:
+  limits:
+    cpu: 500m
+    memory: 4Gi
+  requests:
+    cpu: 200m
+    memory: 1500Mi
+service:
+  externalApiPort: 6060
+  externalHealthPort: 6061
+  internalApiPort: 6060
+  internalHealthPort: 6061
+  internalHealthPath: /healthz
+  type: ClusterIP
+extraEnv:
+- name: CLAIR_CONF
+  value: /etc/clair/config.yaml
+- name: CLAIR_MODE
+  value: combo
+extraArgs: []
