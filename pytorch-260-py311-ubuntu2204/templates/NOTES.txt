@@ -4,16 +4,11 @@
 📦 版本号：{{ .Chart.Version }}
 📥 **下载量：1.8k**
 
-{{- $config := (lookup "v1" "ConfigMap" "devtroncd" "devtron-global-config") }}
-{{- $vksID := .Values.vksID | default "vksID" }}
-{{- if $config }}
-  {{- $vksID = default "vksID" $config.data.vksID }}
-{{- end }}
 
 ✅ **访问 WebUI**，请使用以下 URL：
-🌐 https://{{ .Values.modelName }}-x-{{ .Release.Namespace }}-x-{{ $vksID }}.sproxy.hd-01.alayanew.com:22443/
+🌐 https://{{ .Values.modelName }}-x-{{ .Release.Namespace }}-x-{{ .Values.global.vksID | default "**vksID**" }}.sproxy.{{ .Values.global.zoneID | default "hd-01" }}.alayanew.com:22443/
 
-🔐 **SSH 登录信息**
+🔐 **SSH 登录信息1**
 🧰 {{ .Values.modelName }} 已开放 SSH 端口，便于远程管理。
 📌 **使用步骤如下：**
 1️⃣ 在一个终端窗口中运行以下命令（保持该窗口开启）：

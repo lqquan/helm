@@ -1,7 +1,7 @@
 apiVersion: v2
 type: application
 name: pytorch-260-py311-ubuntu2204
-version: 1.10.5
+version: 1.10.6
 appVersion: v0.12.0
 description: |
   jupyter-pytorch-260-py311-ubuntu2204
@@ -18,9 +18,10 @@ icon: "https://caddy-x-caddy-x-vckg0tnisvp5.sproxy.hd-01.alayanew.com:22443/helm
 
 # home: https://www.substratus.ai
 keywords:
-- CUDA
-- NVIDIA
-- Python
+  - CUDA
+  - NVIDIA
+  - Python
+  - Jupyter
 
 maintainers:
 - name: nstogner

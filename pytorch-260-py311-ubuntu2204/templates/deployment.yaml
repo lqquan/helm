@@ -41,14 +41,14 @@ spec:
               mountPath: /dev/shm
           resources:
             requests:
-              cpu: {{ if eq (int .Values.enableGpu) 1 }}10{{ else }}5{{ end }}
-              memory: {{ if eq (int .Values.enableGpu) 1 }}100G{{ else }}32G{{ end }}
+              cpu: {{ .Values.cpu  }}
+              memory: {{ .Values.memory  }}
               {{- if eq (int .Values.enableGpu) 1 }}
               {{ .Values.gpuKey | quote }}: {{ .Values.gpuCount }}
               {{- end }}
             limits:
-              cpu: {{ if eq (int .Values.enableGpu) 1 }}10{{ else }}5{{ end }}
-              memory: {{ if eq (int .Values.enableGpu) 1 }}100G{{ else }}32G{{ end }}
+              cpu: {{ .Values.cpu  }}
+              memory: {{ .Values.memory  }}
               {{- if eq (int .Values.enableGpu) 1 }}
               {{ .Values.gpuKey | quote }}: {{ .Values.gpuCount }}
               {{- end }}
