@@ -3,13 +3,38 @@ modelName: comfyui
 #如果需要先下载模型，可以选择无卡启动
 enableGpu: 1  # 1: 带GPU启动 , 0: 无卡启动
 
-#GPU型号
-#nvidia.com/gpu-h100-80gb-hbm3  显存80G
-#nvidia.com/gpu-l40s            显存48G
-#GPU型号   #可以从上面的型中选择,无卡启动这里也不需要修改
+## 🚀 GPU 型号与标签信息
+
+### 🏢 北京一区
+
+#  | GPU 型号              | GPU 标签                         | GPU资源配比(CPU:Mem:1GPU) |
+#  |-----------------------|----------------------------------|----------------------------|
+#  | NVIDIA-H800A-NV-80G   | nvidia.com/gpu-h100-80gb-hbm3    | 13C:200G:1GPU              |
+#  | NVIDIA-H800-NV-80G    | nvidia.com/gpu-h800              | 18C:200G:1GPU              |
+#  | NVIDIA-L40S-PCIE-48G  | nvidia.com/gpu-l40s              | 10C:100G:1GPU              |
+
+### 🏢 北京二区
+
+#  | GPU 型号              | GPU 标签                         | GPU资源配比(CPU:Mem:1GPU) |
+#  |-----------------------|----------------------------------|----------------------------|
+#  | NVIDIA-H800A-NV-80G   | nvidia.com/gpu-h800              | 18C:200G:1GPU              |
+
+### 🏢 北京三区
+
+#  | GPU 型号              | GPU 标签                         | GPU资源配比(CPU:Mem:1GPU) |
+#  |-----------------------|----------------------------------|----------------------------|
+#  | NVIDIA-H800E-NV-35G   | nvidia.com/mig-h200-1g.35gb      | 4C:40G:1GPU                |
+#  | NVIDIA-H800E-NV-141G  | nvidia.com/gpu-h200              | 18C:200G:1GPU              |
+
+
+#GPU型号   #可以从上面的型中选择,无卡启动这里也不需要修改 ，填写GPU标签
 gpuKey: nvidia.com/gpu-l40s
 #GPU个数
 gpuCount: 1
+
+cpu: 10
+memory: 100G
+
 ##镜像信息
 image: "comfyui-0.3.27"
 tag: "3.7.3"
